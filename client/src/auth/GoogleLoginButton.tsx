@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
-import { GOOGLE_CLIENT_ID } from "../config";
 import { useAuth } from "./AuthContext";
+import { usePublicConfig } from "../config/PublicConfigContext";
 
 declare global {
   interface Window {
@@ -20,10 +20,12 @@ declare global {
 
 export function GoogleLoginButton() {
   const { loginWithGoogleIdToken, error } = useAuth();
+  const { status } = usePublicConfig();
+  const googleClientId = status.googleClientId;
   const buttonRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!GOOGLE_CLIENT_ID) return;
+    if (!googleClientId) return;
 
     let cancelled = false;
     const tryRender = () => {
@@ -33,7 +35,7 @@ export function GoogleLoginButton() {
         return;
       }
       window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
+        client_id: googleClientId,
         callback: (response) => {
           void loginWithGoogleIdToken(response.credential);
         },
@@ -48,12 +50,12 @@ export function GoogleLoginButton() {
     return () => {
       cancelled = true;
     };
-  }, [loginWithGoogleIdToken]);
+  }, [googleClientId, loginWithGoogleIdToken]);
 
-  if (!GOOGLE_CLIENT_ID) {
+  if (!googleClientId) {
     return (
       <p className="auth-warning">
-        Google sign-in is not configured. Set VITE_GOOGLE_CLIENT_ID to enable login.
+        Google sign-in is not configured yet. Ask a Super Admin to set it under Settings.
       </p>
     );
   }

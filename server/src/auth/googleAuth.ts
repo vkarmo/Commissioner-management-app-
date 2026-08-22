@@ -1,7 +1,5 @@
 import { OAuth2Client } from "google-auth-library";
-import { env } from "../config/env.js";
-
-const client = new OAuth2Client(env.auth.googleClientId);
+import { getConfig } from "../config/runtimeConfig.js";
 
 export interface GoogleProfile {
   email: string;
@@ -11,12 +9,16 @@ export interface GoogleProfile {
 }
 
 export async function verifyGoogleIdToken(idToken: string): Promise<GoogleProfile> {
-  if (!env.auth.googleClientId) {
-    throw new Error("GOOGLE_CLIENT_ID is not configured on the server");
+  const googleClientId = getConfig().googleClientId;
+  if (!googleClientId) {
+    throw new Error("Google sign-in is not configured on the server yet");
   }
+  // Built per call (not cached at module scope) so a Google Client ID
+  // saved later via the Setup Wizard takes effect without a restart.
+  const client = new OAuth2Client(googleClientId);
   const ticket = await client.verifyIdToken({
     idToken,
-    audience: env.auth.googleClientId,
+    audience: googleClientId,
   });
   const payload = ticket.getPayload();
   if (!payload?.email || !payload.email_verified) {
