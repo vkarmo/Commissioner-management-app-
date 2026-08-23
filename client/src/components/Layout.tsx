@@ -28,6 +28,7 @@ export function Layout() {
           ))}
           <NavLink to="/conflicts">Sync Conflicts</NavLink>
           {user && ADMIN_ROLES.has(user.role) && <NavLink to="/admin/whitelist">Whitelist</NavLink>}
+          {user && ADMIN_ROLES.has(user.role) && <NavLink to="/admin/settings">Settings</NavLink>}
         </nav>
       </aside>
       <div className="main">

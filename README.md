@@ -49,23 +49,48 @@ docs/     Design documentation
 
 ```bash
 cd server
-cp .env.example .env   # fill in your AuraDB / Neo4j credentials, Google client ID, JWT secret
 npm install
 npm run dev             # http://localhost:4000
 ```
 
-Set `BOOTSTRAP_SUPER_ADMINS` (comma-separated emails) and
-`BOOTSTRAP_SUPER_ADMIN_COUNTY` in `.env` so the first Super Admin can log
-in and start inviting others — before any `WhitelistEntry` node exists.
+No `.env` needed to get started — see **Setup Wizard** below. If you'd
+rather configure it by file instead, `cp .env.example .env` and fill it
+in before starting the server; the wizard then just won't appear, since
+whatever it needs to check will already be complete.
 
 ### Client
 
 ```bash
 cd client
-cp .env.example .env   # point at the server and your Google OAuth client ID
+cp .env.example .env   # only needs VITE_API_BASE_URL if the server isn't at localhost:4000
 npm install
 npm run dev              # http://localhost:5173
 ```
+
+### Setup Wizard
+
+On first load, the client checks `GET /api/setup/status`. Until the server
+has everything it needs — Neo4j connection, a Google OAuth Client ID, and
+at least one bootstrap Super Admin email — every other `/api/*` route
+returns `503 { setupRequired: true }` and the client shows a setup form
+instead of the login screen (`server/src/routes/setup.routes.ts`,
+`client/src/pages/SetupWizard.tsx`). The form:
+
+1. Takes your Neo4j/AuraDB URI, username, password, and database, with a
+   **Test connection** button that verifies them before anything is saved.
+2. Takes your Google OAuth Client ID (create one at
+   [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+   — OAuth client ID, type "Web application").
+3. Takes the email(s) that should be Super Admin on first login — there's
+   no `WhitelistEntry` yet, so this is the only way in.
+4. Auto-generates a JWT signing secret if you don't supply one.
+
+Submitting writes these to `server/data/runtime-config.json` (gitignored,
+`0600` permissions) rather than `.env`, so it survives without any file
+editing. A signed-in Super Admin can revisit the same form later at
+**Settings** in the sidebar to rotate credentials — the Neo4j password and
+JWT secret are never echoed back to the browser; leaving them blank on a
+resubmit keeps the current value rather than clearing it.
 
 ### Adding a new district or county
 

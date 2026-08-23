@@ -4,3 +4,6 @@ dist/
 .env.local
 *.log
 .DS_Store
+
+# Credentials saved via the in-app Setup Wizard (server/src/routes/setup.routes.ts)
+server/data/

@@ -1,5 +1,5 @@
 import { getSession } from "../db/neo4j.js";
-import { env } from "../config/env.js";
+import { getConfig } from "../config/runtimeConfig.js";
 import type { Role } from "../schema/resources.js";
 import type { GoogleProfile } from "./googleAuth.js";
 import type { SessionUser } from "../types/index.js";
@@ -77,11 +77,12 @@ export async function authorizeProfile(profile: GoogleProfile): Promise<SessionU
     };
   }
 
-  if (env.auth.bootstrapSuperAdmins.includes(profile.email)) {
+  const config = getConfig();
+  if (config.bootstrapSuperAdmins.includes(profile.email)) {
     const bootstrapEntry: WhitelistEntryProps = {
       email: profile.email,
       role: "SuperAdmin",
-      county: env.auth.bootstrapSuperAdminCounty,
+      county: config.bootstrapSuperAdminCounty,
       active: true,
     };
     await upsertUser(profile, bootstrapEntry);
