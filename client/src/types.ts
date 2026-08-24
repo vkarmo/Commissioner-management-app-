@@ -36,6 +36,7 @@ export interface ResourceModule {
   label: string; // human-readable, e.g. "Cases"
   fields: FieldConfig[];
   titleField: string; // which field to show as the row title
+  group: string; // sidebar section heading, e.g. "Case & Land"
 }
 
 export interface FieldConfig {

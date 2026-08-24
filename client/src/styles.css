@@ -50,6 +50,23 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  overflow-y: auto;
+}
+
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-top: 0.75rem;
+}
+
+.nav-group-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+  padding: 0 0.6rem;
+  margin-bottom: 0.15rem;
 }
 
 .sidebar nav a {
@@ -152,6 +169,47 @@ button[type="submit"],
   font-size: 0.9rem;
 }
 
+.stat-card-flag {
+  border-left: 4px solid var(--danger);
+}
+
+.dashboard-group-heading {
+  margin: 1.75rem 0 0.75rem;
+  font-size: 1rem;
+  color: var(--muted);
+}
+
+.apparatus-tile {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.25rem;
+  margin-top: 1rem;
+}
+
+.apparatus-tile h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.apparatus-grid {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.apparatus-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.apparatus-label {
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-transform: capitalize;
+}
+
 .record-table {
   width: 100%;
   border-collapse: collapse;
@@ -167,6 +225,20 @@ button[type="submit"],
   padding: 0.6rem 0.9rem;
   border-bottom: 1px solid var(--border);
   font-size: 0.9rem;
+}
+
+.record-table td input {
+  width: 100%;
+  padding: 0.35rem;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  background: transparent;
+}
+
+.record-table td input:focus {
+  border-color: var(--border);
+  background: white;
 }
 
 .record-form {
@@ -289,6 +361,61 @@ button[type="submit"],
   align-items: center;
   gap: 0.75rem;
   margin-top: 0.4rem;
+}
+
+.fire-actions-panel {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.25rem;
+  max-width: 480px;
+  margin-top: 1.5rem;
+}
+
+.fire-actions-block {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.fire-actions-block h3 {
+  margin: 0 0 0.3rem;
+  font-size: 0.95rem;
+}
+
+.fire-actions-block textarea {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: inherit;
+}
+
+.inline-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.inline-controls select {
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.water-point-list {
+  margin: 0.3rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.dispute-flag {
+  background: #fde8e6;
+  color: var(--danger);
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-weight: 600;
 }
 
 .conflict-card {

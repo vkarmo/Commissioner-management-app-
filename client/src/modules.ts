@@ -1,63 +1,147 @@
 import type { ResourceModule } from "./types";
 
 /**
- * Field configuration for each of the 12 business resources. This drives
- * the generic list/detail/form UI (src/pages/ResourcePage.tsx) so adding
- * a new module is a config entry here, not a new page — deliberately
- * mirrors the server's schema-driven approach in resources.ts.
+ * Field configuration for each business resource. This drives the generic
+ * list/detail/form UI (src/pages/ResourceListPage.tsx, ResourceFormPage.tsx)
+ * so adding a new module is a config entry here, not a new page —
+ * deliberately mirrors the server's schema-driven approach in
+ * server/src/schema/resources.ts. `group` controls sidebar grouping
+ * (see components/Layout.tsx).
  */
 export const MODULES: ResourceModule[] = [
   {
     key: "people",
     resource: "Person",
     label: "People",
+    group: "Community",
     titleField: "full_name",
     fields: [
       { key: "full_name", label: "Full name", type: "text", required: true },
       { key: "phone", label: "Phone", type: "text" },
       { key: "quarter", label: "Quarter/Town", type: "text" },
+      { key: "role", label: "Role", type: "select", options: ["citizen", "official", "clerk"] },
       { key: "notes", label: "Notes", type: "textarea" },
+    ],
+  },
+  {
+    key: "officials",
+    resource: "Official",
+    label: "Officials",
+    group: "Community",
+    titleField: "full_name",
+    fields: [
+      { key: "full_name", label: "Full name", type: "text", required: true },
+      {
+        key: "role",
+        label: "Role",
+        type: "select",
+        required: true,
+        options: ["commissioner", "clerk", "chief", "other"],
+      },
+      { key: "office_title", label: "Office title", type: "text" },
+      { key: "phone", label: "Phone", type: "text" },
     ],
   },
   {
     key: "cases",
     resource: "Case",
     label: "Cases",
+    group: "Case & Land",
     titleField: "case_number",
     fields: [
       { key: "case_number", label: "Case number", type: "text", required: true },
-      { key: "type", label: "Type", type: "text", required: true },
+      {
+        key: "type",
+        label: "Type",
+        type: "select",
+        required: true,
+        options: ["land", "family", "debt", "chieftaincy", "criminal-referral", "other"],
+      },
       {
         key: "status",
         label: "Status",
         type: "select",
         required: true,
-        options: ["open", "hearing_scheduled", "referred", "resolved", "closed"],
+        options: ["intake_pending", "open", "mediation", "resolved", "referred"],
       },
+      { key: "quarter", label: "Quarter/Town", type: "text" },
       { key: "filed_date", label: "Filed date", type: "date" },
       { key: "summary", label: "Summary", type: "textarea" },
+      { key: "reporter_name", label: "Reporter name (if from intake)", type: "text" },
+      { key: "reporter_phone", label: "Reporter phone", type: "text" },
+      { key: "respondent_name", label: "Respondent name", type: "text" },
+    ],
+  },
+  {
+    key: "hearings",
+    resource: "Hearing",
+    label: "Hearings",
+    group: "Case & Land",
+    titleField: "location",
+    fields: [
+      { key: "date", label: "Date", type: "date", required: true },
+      { key: "location", label: "Location", type: "text" },
+      { key: "outcome_notes", label: "Outcome notes", type: "textarea" },
     ],
   },
   {
     key: "parcels",
     resource: "Parcel",
     label: "Land Parcels",
+    group: "Case & Land",
     titleField: "parcel_ref",
     fields: [
       { key: "parcel_ref", label: "Parcel reference", type: "text" },
       { key: "quarter", label: "Quarter/Town", type: "text" },
       { key: "location_desc", label: "Location description", type: "textarea" },
       { key: "status", label: "Status", type: "text" },
+      { key: "acreage", label: "Acreage", type: "number" },
+      { key: "land_use", label: "Land use", type: "text" },
+      { key: "geometry_geojson", label: "Boundary (GeoJSON, optional)", type: "textarea" },
+    ],
+  },
+  {
+    key: "deeds",
+    resource: "Deed",
+    label: "Deeds",
+    group: "Case & Land",
+    titleField: "deed_number",
+    fields: [
+      { key: "deed_number", label: "Deed number", type: "text", required: true },
+      { key: "issue_date", label: "Issue date", type: "date" },
+      {
+        key: "type",
+        label: "Type",
+        type: "select",
+        options: ["tribal_certificate", "deed_of_gift", "lease"],
+      },
+    ],
+  },
+  {
+    key: "disputes",
+    resource: "Dispute",
+    label: "Land Disputes",
+    group: "Case & Land",
+    titleField: "notes",
+    fields: [
+      { key: "status", label: "Status", type: "select", required: true, options: ["open", "resolved"] },
+      { key: "notes", label: "Notes", type: "textarea" },
     ],
   },
   {
     key: "public-works",
     resource: "PublicWorksItem",
     label: "Public Works",
+    group: "Revenue & Works",
     titleField: "title",
     fields: [
       { key: "title", label: "Title", type: "text", required: true },
-      { key: "category", label: "Category", type: "text" },
+      {
+        key: "category",
+        label: "Category",
+        type: "select",
+        options: ["road", "water_point", "school", "clinic", "other"],
+      },
       { key: "quarter", label: "Quarter/Town", type: "text" },
       {
         key: "status",
@@ -67,12 +151,16 @@ export const MODULES: ResourceModule[] = [
         options: ["planned", "funded", "in_progress", "completed", "stalled"],
       },
       { key: "target_date", label: "Target date", type: "date" },
+      { key: "gps_lat", label: "GPS latitude", type: "number" },
+      { key: "gps_lng", label: "GPS longitude", type: "number" },
+      { key: "photo_reference", label: "Photo reference (URL)", type: "text" },
     ],
   },
   {
     key: "revenue",
     resource: "RevenueRecord",
     label: "Revenue",
+    group: "Revenue & Works",
     titleField: "source",
     fields: [
       { key: "source", label: "Source", type: "text", required: true },
@@ -85,6 +173,7 @@ export const MODULES: ResourceModule[] = [
     key: "meetings",
     resource: "Meeting",
     label: "Meetings",
+    group: "Communications",
     titleField: "title",
     fields: [
       { key: "title", label: "Title", type: "text", required: true },
@@ -97,6 +186,7 @@ export const MODULES: ResourceModule[] = [
     key: "communications",
     resource: "CommunicationLog",
     label: "Communications",
+    group: "Communications",
     titleField: "summary",
     fields: [
       {
@@ -114,9 +204,86 @@ export const MODULES: ResourceModule[] = [
     ],
   },
   {
+    key: "fire-incidents",
+    resource: "FireIncident",
+    label: "Fire Incidents",
+    group: "Fire",
+    titleField: "incident_type",
+    fields: [
+      {
+        key: "incident_type",
+        label: "Incident type",
+        type: "select",
+        required: true,
+        options: ["structure", "market", "bush", "electrical", "other"],
+      },
+      { key: "quarter", label: "Quarter/Town", type: "text" },
+      { key: "date_reported", label: "Date reported", type: "date", required: true },
+      {
+        key: "status",
+        label: "Status",
+        type: "select",
+        required: true,
+        options: ["reported", "responding", "contained", "resolved", "referred_to_lnfs"],
+      },
+      { key: "casualties", label: "Casualties", type: "text" },
+      { key: "estimated_damage", label: "Estimated damage", type: "text" },
+      { key: "description", label: "Description", type: "textarea" },
+      { key: "photo_reference", label: "Photo reference (URL)", type: "text" },
+      { key: "gps_lat", label: "GPS latitude", type: "number" },
+      { key: "gps_lng", label: "GPS longitude", type: "number" },
+      { key: "reporter_name", label: "Reporter name", type: "text" },
+      { key: "reporter_phone", label: "Reporter phone", type: "text" },
+    ],
+  },
+  {
+    key: "fire-stations",
+    resource: "FireStation",
+    label: "Fire Stations",
+    group: "Fire",
+    titleField: "name",
+    fields: [
+      { key: "name", label: "Name", type: "text" },
+      { key: "status", label: "Status", type: "select", required: true, options: ["operational", "under_construction"] },
+      { key: "gps_lat", label: "GPS latitude", type: "number" },
+      { key: "gps_lng", label: "GPS longitude", type: "number" },
+    ],
+  },
+  {
+    key: "fire-apparatus",
+    resource: "FireApparatus",
+    label: "Fire Apparatus",
+    group: "Fire",
+    titleField: "type",
+    fields: [
+      { key: "type", label: "Type", type: "text", required: true },
+      {
+        key: "status",
+        label: "Status",
+        type: "select",
+        required: true,
+        options: ["operational", "maintenance", "out_of_service"],
+      },
+      { key: "acquisition_date", label: "Acquisition date", type: "date" },
+    ],
+  },
+  {
+    key: "fire-agencies",
+    resource: "FireAgency",
+    label: "Fire Agencies",
+    group: "Fire",
+    titleField: "name",
+    fields: [
+      { key: "name", label: "Name", type: "text", required: true },
+      { key: "contact", label: "Contact", type: "text" },
+      { key: "station_location", label: "Station location", type: "text" },
+    ],
+  },
+  {
     key: "budgets",
     resource: "Budget",
     label: "Budgets",
+    group: "Finance",
     titleField: "fiscal_year",
     fields: [
       { key: "fiscal_year", label: "Fiscal year", type: "text", required: true },
@@ -135,6 +302,7 @@ export const MODULES: ResourceModule[] = [
     key: "budget-line-items",
     resource: "BudgetLineItem",
     label: "Budget Line Items",
+    group: "Finance",
     titleField: "category",
     fields: [
       { key: "category", label: "Category", type: "text", required: true },
@@ -146,6 +314,7 @@ export const MODULES: ResourceModule[] = [
     key: "disbursements",
     resource: "Disbursement",
     label: "Disbursements",
+    group: "Finance",
     titleField: "reference_number",
     fields: [
       { key: "amount", label: "Amount (LRD)", type: "number", required: true },
@@ -158,6 +327,7 @@ export const MODULES: ResourceModule[] = [
     key: "expenditures",
     resource: "Expenditure",
     label: "Expenditures",
+    group: "Finance",
     titleField: "payee",
     fields: [
       { key: "payee", label: "Vendor / payee", type: "text", required: true },
@@ -170,6 +340,7 @@ export const MODULES: ResourceModule[] = [
     key: "approval-actions",
     resource: "ApprovalAction",
     label: "Approval Actions",
+    group: "Finance",
     titleField: "approving_body",
     fields: [
       {
@@ -191,6 +362,8 @@ export const MODULES: ResourceModule[] = [
     ],
   },
 ];
+
+export const MODULE_GROUP_ORDER = ["Community", "Case & Land", "Revenue & Works", "Communications", "Fire", "Finance"];
 
 export function findModule(key: string): ResourceModule | undefined {
   return MODULES.find((m) => m.key === key);

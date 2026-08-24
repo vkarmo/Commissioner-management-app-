@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { MODULES } from "../modules";
+import { MODULE_GROUP_ORDER, MODULES } from "../modules";
 import { useAuth } from "../auth/AuthContext";
 import { OfflineIndicator } from "./OfflineIndicator";
 
@@ -21,14 +21,27 @@ export function Layout() {
           <NavLink to="/" end>
             Dashboard
           </NavLink>
-          {MODULES.map((m) => (
-            <NavLink key={m.key} to={`/${m.key}`}>
-              {m.label}
-            </NavLink>
-          ))}
-          <NavLink to="/conflicts">Sync Conflicts</NavLink>
-          {user && ADMIN_ROLES.has(user.role) && <NavLink to="/admin/whitelist">Whitelist</NavLink>}
-          {user && ADMIN_ROLES.has(user.role) && <NavLink to="/admin/settings">Settings</NavLink>}
+          {MODULE_GROUP_ORDER.map((group) => {
+            const groupModules = MODULES.filter((m) => m.group === group);
+            if (groupModules.length === 0) return null;
+            return (
+              <div className="nav-group" key={group}>
+                <span className="nav-group-label">{group}</span>
+                {group === "Community" && <NavLink to="/community">Community Registry</NavLink>}
+                {groupModules.map((m) => (
+                  <NavLink key={m.key} to={`/${m.key}`}>
+                    {m.label}
+                  </NavLink>
+                ))}
+              </div>
+            );
+          })}
+          <div className="nav-group">
+            <span className="nav-group-label">System</span>
+            <NavLink to="/conflicts">Sync Conflicts</NavLink>
+            {user && ADMIN_ROLES.has(user.role) && <NavLink to="/admin/whitelist">Whitelist</NavLink>}
+            {user && ADMIN_ROLES.has(user.role) && <NavLink to="/admin/settings">Settings</NavLink>}
+          </div>
         </nav>
       </aside>
       <div className="main">
