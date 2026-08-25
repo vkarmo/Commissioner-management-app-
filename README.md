@@ -172,14 +172,17 @@ Per the design recap's build sequencing: no code change is required.
 
 This is a monorepo with two independently deployable apps, so it deploys
 as **two separate Cloud Run services** — each with its own `Dockerfile`
-(`server/Dockerfile`, `client/Dockerfile`). If you set up Cloud Run's
-"Continuously deploy from a repository" option and got *"We could not
-find a valid build file"*, that's why: Cloud Build was looking at the
-repo root, which has neither a `Dockerfile` nor a `cloudbuild.yaml`. Fix
-it by setting each service's **build source directory** to `server` or
-`client` respectively (Console: the build configuration step has a
-"Source location"/build context field; CLI: `--source server` /
-`--source client`, shown below).
+(`server/Dockerfile`, `client/Dockerfile`).
+
+**Don't use Cloud Run's "Create Service from repository" Console
+wizard for this repo.** That wizard only ever looks at the repo root for
+a `Dockerfile`/`cloudbuild.yaml` and — at least as of writing — doesn't
+offer a way to point it at a subdirectory, so it will always fail with
+*"We could not find a valid build file"* here, no matter what's in
+`server/` or `client/`. Use the `gcloud` CLI instead (below); its
+`--source <dir>` flag builds from exactly the directory you name, no
+Console field-hunting required, and doesn't need Docker installed
+locally — Cloud Build does the build remotely.
 
 ### Two things that only matter for Cloud Run, not local dev
 
@@ -192,44 +195,45 @@ it by setting each service's **build source directory** to `server` or
    deploy time instead** (below) and skip the wizard — `.env`-style env
    vars are read as a fallback whenever the file is empty, so this just
    works.
-2. **`VITE_API_BASE_URL` is baked into the client at build time**, not
-   read at runtime (that's how Vite env vars work) — so the client image
-   has to be built *after* the server is deployed and its URL is known.
+2. **The client learns the server's URL at container startup, not at
+   build time.** `docker-entrypoint.sh` writes it into
+   `dist/runtime-config.js` from the `API_BASE_URL` env var when the
+   container starts (`client/src/config.ts` reads it from there before
+   falling back to the build-time `VITE_API_BASE_URL` used in local dev).
+   That means the two services can be deployed in either order and
+   re-pointed at each other later with `gcloud run services update
+   --set-env-vars`, without rebuilding an image.
 
 ### Deploy
 
 ```bash
 # --- Server ---
-cd server
-docker build -t gcr.io/YOUR_PROJECT/commissioner-server .
-docker push gcr.io/YOUR_PROJECT/commissioner-server
 gcloud run deploy commissioner-server \
-  --image gcr.io/YOUR_PROJECT/commissioner-server \
+  --source server \
   --region YOUR_REGION \
   --allow-unauthenticated \
   --set-env-vars NEO4J_URI=neo4j+s://xxxx.databases.neo4j.io,NEO4J_USERNAME=neo4j,NEO4J_DATABASE=neo4j,GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com,BOOTSTRAP_SUPER_ADMINS=you@example.com,BOOTSTRAP_SUPER_ADMIN_COUNTY=Bomi \
   --set-secrets NEO4J_PASSWORD=neo4j-password:latest,JWT_SECRET=jwt-secret:latest
-# Note the printed Service URL — you need it for the client build below.
+# Note the printed Service URL — you need it below.
 
-# --- Client (build only after you have the server's URL) ---
-cd ../client
-docker build \
-  --build-arg VITE_API_BASE_URL=https://commissioner-server-xxxx.a.run.app/api \
-  -t gcr.io/YOUR_PROJECT/commissioner-client .
-docker push gcr.io/YOUR_PROJECT/commissioner-client
+# --- Client ---
 gcloud run deploy commissioner-client \
-  --image gcr.io/YOUR_PROJECT/commissioner-client \
+  --source client \
   --region YOUR_REGION \
-  --allow-unauthenticated
+  --allow-unauthenticated \
+  --set-env-vars API_BASE_URL=https://commissioner-server-xxxx.a.run.app/api
 # Note this Service URL too.
 
-# --- Wire the two together ---
+# --- Point the server back at the client (for CORS) ---
 gcloud run services update commissioner-server \
   --region YOUR_REGION \
   --update-env-vars CORS_ORIGIN=https://commissioner-client-xxxx.a.run.app
 ```
 
-`NEO4J_PASSWORD` and `JWT_SECRET` above go through
+`--source <dir>` requires the [gcloud CLI](https://cloud.google.com/sdk/docs/install)
+(`gcloud auth login`, `gcloud config set project YOUR_PROJECT` first) —
+it uploads that directory and has Cloud Build build+push the image for
+you, then deploys it. `NEO4J_PASSWORD` and `JWT_SECRET` above go through
 [Secret Manager](https://cloud.google.com/secret-manager) rather than
 plain `--set-env-vars`, since Cloud Run logs/shows env var values in
 plaintext in the console; create them first with e.g.
