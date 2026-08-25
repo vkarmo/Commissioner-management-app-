@@ -67,6 +67,10 @@ export const RESOURCES: Record<string, ResourceDef> = {
     { key: "name", type: "string", required: true },
     { key: "district", type: "string", required: true },
     { key: "county", type: "string", required: true },
+    // Community Registry (build prompt §3): basic per-quarter directory data.
+    { key: "chief_name", type: "string" },
+    { key: "chief_phone", type: "string" },
+    { key: "population", type: "number" },
   ]),
 
   // --- Admin / auth ---
@@ -94,27 +98,44 @@ export const RESOURCES: Record<string, ResourceDef> = {
     { key: "full_name", type: "string", required: true },
     { key: "phone", type: "string" },
     { key: "quarter", type: "string" },
+    { key: "role", type: "string" }, // citizen | official | clerk
+    { key: "is_quarter_chief", type: "boolean" },
     { key: "notes", type: "string" },
   ]),
   Case: resource("Case", true, [
     { key: "case_number", type: "string", required: true },
-    { key: "type", type: "string", required: true },
-    { key: "status", type: "string", required: true },
+    { key: "type", type: "string", required: true }, // land | family | debt | chieftaincy | criminal-referral | other
+    { key: "status", type: "string", required: true }, // intake_pending | open | mediation | resolved | referred
+    { key: "quarter", type: "string" },
     { key: "summary", type: "string" },
     { key: "filed_date", type: "date" },
+    // Populated when filed via the SMS/WhatsApp intake stub, before a clerk
+    // has linked a real Person record for reporter/respondent.
+    { key: "reporter_name", type: "string" },
+    { key: "reporter_phone", type: "string" },
+    { key: "respondent_name", type: "string" },
   ]),
   Parcel: resource("Parcel", true, [
     { key: "parcel_ref", type: "string" },
     { key: "quarter", type: "string" },
     { key: "location_desc", type: "string" },
     { key: "status", type: "string" },
+    { key: "acreage", type: "number" },
+    { key: "land_use", type: "string" },
+    // Metes-and-bounds geometry, stored as a GeoJSON string (build prompt §Land
+    // Records "stretch goal"); parsed client-side only where present, never
+    // required — most offices won't have surveyed geometry to enter.
+    { key: "geometry_geojson", type: "string" },
   ]),
   PublicWorksItem: resource("PublicWorksItem", true, [
     { key: "title", type: "string", required: true },
-    { key: "category", type: "string" },
+    { key: "category", type: "string" }, // road | water_point | school | clinic | other
     { key: "quarter", type: "string" },
     { key: "status", type: "string", required: true },
     { key: "target_date", type: "date" },
+    { key: "gps_lat", type: "number" },
+    { key: "gps_lng", type: "number" },
+    { key: "photo_reference", type: "string" },
   ]),
   RevenueRecord: resource("RevenueRecord", true, [
     { key: "amount", type: "number", required: true },
@@ -135,6 +156,65 @@ export const RESOURCES: Record<string, ResourceDef> = {
     { key: "date", type: "date", required: true },
     { key: "contact_name", type: "string" },
     { key: "contact_phone", type: "string" },
+  ]),
+
+  // --- Case Tracker / Land Records support entities ---
+  Official: resource("Official", true, [
+    { key: "full_name", type: "string", required: true },
+    { key: "role", type: "string", required: true }, // commissioner | clerk | chief | other
+    { key: "office_title", type: "string" },
+    { key: "phone", type: "string" },
+  ]),
+  Hearing: resource("Hearing", true, [
+    { key: "date", type: "date", required: true },
+    { key: "location", type: "string" },
+    { key: "outcome_notes", type: "string" },
+  ]),
+  Deed: resource("Deed", true, [
+    { key: "deed_number", type: "string", required: true },
+    { key: "issue_date", type: "date" },
+    { key: "type", type: "string" }, // tribal_certificate | deed_of_gift | lease
+  ]),
+  Dispute: resource("Dispute", true, [
+    { key: "status", type: "string", required: true }, // open | resolved
+    { key: "notes", type: "string" },
+  ]),
+
+  // --- Fire Incident Reporting (build prompt module 8) ---
+  FireIncident: resource("FireIncident", true, [
+    { key: "incident_type", type: "string", required: true }, // structure | market | bush | electrical | other
+    { key: "quarter", type: "string" },
+    { key: "date_reported", type: "date", required: true },
+    // reported | responding | contained | resolved | referred_to_lnfs
+    { key: "status", type: "string", required: true },
+    { key: "casualties", type: "string" },
+    { key: "estimated_damage", type: "string" },
+    { key: "description", type: "string" },
+    { key: "photo_reference", type: "string" },
+    { key: "gps_lat", type: "number" },
+    { key: "gps_lng", type: "number" },
+    { key: "reporter_name", type: "string" },
+    { key: "reporter_phone", type: "string" },
+  ]),
+  // Optional per office — most Commissioner's Offices have no local station
+  // and rely entirely on FireAgency referral (build prompt module 8).
+  FireStation: resource("FireStation", true, [
+    { key: "name", type: "string" },
+    { key: "status", type: "string", required: true }, // operational | under_construction
+    { key: "gps_lat", type: "number" },
+    { key: "gps_lng", type: "number" },
+  ]),
+  FireApparatus: resource("FireApparatus", true, [
+    { key: "type", type: "string", required: true }, // truck
+    { key: "status", type: "string", required: true }, // operational | maintenance | out_of_service
+    { key: "acquisition_date", type: "date" },
+  ]),
+  // Not an app user/role — an external body (e.g. LNFS), same treatment as
+  // County Council in the ApprovalAction/RECORDED_VIA pattern.
+  FireAgency: resource("FireAgency", true, [
+    { key: "name", type: "string", required: true },
+    { key: "contact", type: "string" },
+    { key: "station_location", type: "string" },
   ]),
 
   // --- Budget / fund-tracking layer (design recap §3) ---
@@ -208,14 +288,34 @@ export const RELATIONSHIPS: RelationshipDef[] = [
   { type: "WITHIN", from: "District", to: "County" },
   { type: "WITHIN", from: "Quarter", to: "District" },
 
+  { type: "FILED", from: "Person", to: "Case" },
+  { type: "NAMED_IN", from: "Person", to: "Case" },
   { type: "INVOLVES", from: "Case", to: "Person" },
   { type: "CONCERNS", from: "Case", to: "Parcel" },
+  { type: "HEARD_AT", from: "Case", to: "Hearing" },
+  { type: "PRESIDED_OVER", from: "Official", to: "Hearing" },
+  { type: "REFERRED_TO", from: "Case", to: "Official" },
+  { type: "LOCATED_IN", from: "Case", to: "Quarter" },
   { type: "LOCATED_IN", from: "Parcel", to: "Quarter" },
   { type: "LOCATED_IN", from: "PublicWorksItem", to: "Quarter" },
+  { type: "HOLDS", from: "Person", to: "Deed" },
+  { type: "COVERS", from: "Deed", to: "Parcel" },
+  { type: "ADJACENT_TO", from: "Parcel", to: "Parcel" },
+  { type: "SUBJECT_OF", from: "Parcel", to: "Dispute" },
   { type: "PAID_BY", from: "RevenueRecord", to: "Person" },
   { type: "CONCERNS", from: "Meeting", to: "Case" },
   { type: "REGARDING_PERSON", from: "CommunicationLog", to: "Person" },
   { type: "REGARDING_CASE", from: "CommunicationLog", to: "Case" },
+
+  { type: "REPORTED", from: "Person", to: "FireIncident" },
+  { type: "LOCATED_IN", from: "FireIncident", to: "Quarter" },
+  { type: "NEAR", from: "FireIncident", to: "PublicWorksItem" },
+  { type: "PART_OF", from: "FireStation", to: "Official" },
+  { type: "STATIONED_AT", from: "FireApparatus", to: "FireStation" },
+  { type: "RESPONDED_BY", from: "FireIncident", to: "FireStation" },
+  { type: "REFERRED_TO", from: "FireIncident", to: "FireAgency" },
+  { type: "LINKED_TO", from: "FireIncident", to: "CommunicationLog" },
+  { type: "LOGGED", from: "Official", to: "FireIncident" },
 
   { type: "ALLOCATED_TO", from: "Budget", to: "BudgetLineItem" },
   { type: "FUNDS", from: "BudgetLineItem", to: "PublicWorksItem" },

@@ -3,6 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { findModule } from "../modules";
 import { createResource, getResource, updateResource } from "../api/resources";
 import { RecordForm } from "../components/RecordForm";
+import { FireIncidentActions } from "../components/FireIncidentActions";
+import { ParcelDetailPanel } from "../components/ParcelDetailPanel";
 
 export function ResourceFormPage() {
   const { moduleKey = "", id } = useParams();
@@ -40,6 +42,12 @@ export function ResourceFormPage() {
           }}
         />
       )}
+      {/* Online-only conveniences layered on the offline-first form above:
+          dispatch actions and cross-record lookups both need a live
+          connection to create relationships/read joined data, unlike the
+          base form which always works from the local queue/cache. */}
+      {!isNew && id && module.key === "fire-incidents" && <FireIncidentActions incidentId={id} />}
+      {!isNew && id && module.key === "parcels" && <ParcelDetailPanel parcelId={id} />}
     </div>
   );
 }

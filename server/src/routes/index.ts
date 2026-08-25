@@ -5,6 +5,10 @@ import { configRouter } from "./config.routes.js";
 import { relateRouter } from "./relate.routes.js";
 import { syncRouter } from "./sync.routes.js";
 import { createResourceRouter } from "./resource.routes.js";
+import { fireIncidentActionsRouter } from "./fireIncidentActions.routes.js";
+import { landRecordsRouter } from "./landRecords.routes.js";
+import { communityRouter } from "./community.routes.js";
+import { intakeRouter } from "./intake.routes.js";
 import { OFFICE_STAFF, COUNTY_AGGREGATE_READERS, COUNTY_FINANCE } from "../schema/roleGroups.js";
 
 export const apiRouter = Router();
@@ -14,6 +18,8 @@ apiRouter.use("/admin", adminRouter);
 apiRouter.use("/config", configRouter);
 apiRouter.use("/relate", relateRouter);
 apiRouter.use("/sync", syncRouter);
+apiRouter.use("/intake", intakeRouter);
+apiRouter.use("/community", communityRouter);
 
 // The original 7-module schema: office business only, per design recap §4
 // ("county-scoped roles ... not case/land detail").
@@ -32,6 +38,32 @@ apiRouter.use("/meetings", createResourceRouter("Meeting", { readRoles: OFFICE_S
 apiRouter.use(
   "/communications",
   createResourceRouter("CommunicationLog", { readRoles: OFFICE_STAFF, writeRoles: OFFICE_STAFF }),
+);
+
+// Case Tracker / Land Records support entities.
+apiRouter.use("/officials", createResourceRouter("Official", { readRoles: OFFICE_STAFF, writeRoles: OFFICE_STAFF }));
+apiRouter.use("/hearings", createResourceRouter("Hearing", { readRoles: OFFICE_STAFF, writeRoles: OFFICE_STAFF }));
+apiRouter.use("/deeds", createResourceRouter("Deed", { readRoles: OFFICE_STAFF, writeRoles: OFFICE_STAFF }));
+apiRouter.use("/disputes", createResourceRouter("Dispute", { readRoles: OFFICE_STAFF, writeRoles: OFFICE_STAFF }));
+apiRouter.use("/parcels", landRecordsRouter);
+
+// Fire Incident Reporting (build prompt module 8).
+apiRouter.use(
+  "/fire-incidents",
+  createResourceRouter("FireIncident", { readRoles: OFFICE_STAFF, writeRoles: OFFICE_STAFF }),
+);
+apiRouter.use("/fire-incidents", fireIncidentActionsRouter);
+apiRouter.use(
+  "/fire-stations",
+  createResourceRouter("FireStation", { readRoles: OFFICE_STAFF, writeRoles: OFFICE_STAFF }),
+);
+apiRouter.use(
+  "/fire-apparatus",
+  createResourceRouter("FireApparatus", { readRoles: OFFICE_STAFF, writeRoles: OFFICE_STAFF }),
+);
+apiRouter.use(
+  "/fire-agencies",
+  createResourceRouter("FireAgency", { readRoles: OFFICE_STAFF, writeRoles: OFFICE_STAFF }),
 );
 
 // Budget / fund-tracking layer: office staff write (Clerks transcribe

@@ -14,15 +14,51 @@ client/   React PWA (Vite) — Dexie offline queue, Google OAuth login, module U
 docs/     Design documentation
 ```
 
+## Modules
+
+| Module | Nodes | Notes |
+|---|---|---|
+| Case Tracker | `Case`, `Hearing`, `Official` | `Case` links to `Person` (`FILED`/`NAMED_IN`), `Parcel` (`CONCERNS`), `Quarter`, and can be `REFERRED_TO` an `Official`; `Hearing`s are `PRESIDED_OVER` by an `Official`. |
+| Land Records | `Parcel`, `Deed`, `Dispute` | Deed history (`HOLDS`/`COVERS`), `ADJACENT_TO` parcel links for boundary queries without full geometry, and a `SUBJECT_OF` dispute flag. Optional GeoJSON boundary per parcel. |
+| Community Registry | `Person`, `Quarter` | Household/citizen directory plus a per-quarter chief/population/contact directory. |
+| Revenue & Market | `RevenueRecord` | Dues/levies with source, amount, date, receipt reference. |
+| Public Works | `PublicWorksItem` | Roads/water points/schools/clinics with status, optional GPS and photo reference. |
+| Communications | `CommunicationLog` | Correspondence with County/line ministries; also used by the fire-referral workflow below. |
+| Meetings | `Meeting` | Palava hut / community meeting minutes. |
+| **Fire Incident Reporting** | `FireIncident`, `FireStation`, `FireApparatus`, `FireAgency` | See below. |
+| Admin | `WhitelistEntry`, `User`, `SyncConflict` | Whitelist management, roles, sync conflict review. |
+
+Plus a Budget/Approval layer (`Budget`, `BudgetLineItem`, `Disbursement`,
+`Expenditure`, `ApprovalAction`) that records — rather than hosts —
+county-level approval decisions, linked to a `CommunicationLog` entry via
+`RECORDED_VIA` so every approval has a traceable paper/verbal trail even
+before county staff have their own logins.
+
+### Fire Incident Reporting
+
+A `FireStation`/`FireApparatus` pair is **optional per office** — most
+Commissioner's Offices have neither and rely entirely on referral. Where
+one exists (Johnsonville has an on-site truck and a station under
+construction — see the seed script), the incident detail screen offers
+two actions instead of one:
+
+- **Respond Locally** — only shown if an *operational* `FireStation`
+  exists; creates `RESPONDED_BY` and advances status to `responding`.
+- **Refer to LNFS** — always available (the default path for offices
+  without a station, and for Johnsonville's mutual-aid cases beyond local
+  capacity); creates `REFERRED_TO` a `FireAgency` plus a `CommunicationLog`
+  entry linked via `LINKED_TO`, and advances status to `referred_to_lnfs`.
+
+Intake also suggests the nearest known water point (`NEAR` a
+`PublicWorksItem` of category `water_point`) for community bucket-brigade
+guidance — by GPS distance where both records have coordinates, falling
+back to same-quarter matching otherwise
+(`server/src/routes/fireIncidentActions.routes.ts`).
+
 ## Architecture at a glance
 
-- **Graph model**: Neo4j nodes for the original 7 modules (Person, Case,
-  Parcel, PublicWorksItem, RevenueRecord, Meeting, CommunicationLog) plus a
-  Budget/Approval layer (Budget, BudgetLineItem, Disbursement, Expenditure,
-  ApprovalAction) that records — rather than hosts — county-level approval
-  decisions, linked to a `CommunicationLog` entry via `RECORDED_VIA` so
-  every approval has a traceable paper/verbal trail even before county
-  staff have their own logins. Full schema: `server/src/schema/resources.ts`.
+- **Graph model**: Neo4j nodes per the module table above. Full schema
+  and relationship allowlist: `server/src/schema/resources.ts`.
 - **Multi-tenancy**: every district-specific node carries denormalized
   `county` + `district` properties from day one (`server/src/schema/resources.ts`,
   `server/src/services/graphService.ts`), and every API query is filtered
@@ -92,6 +128,37 @@ editing. A signed-in Super Admin can revisit the same form later at
 JWT secret are never echoed back to the browser; leaving them blank on a
 resubmit keeps the current value rather than clearing it.
 
+### Sample data
+
+Once the Setup Wizard is done (so the server has a real Neo4j connection):
+
+```bash
+cd server
+npm run seed
+```
+
+Populates Johnsonville/Bomi sample data — quarters with chiefs, a few
+citizens and officials, a land dispute with a deed and an adjacent
+parcel, a case with a hearing, public works including two water points
+with GPS coordinates, a fire station (`under_construction`) with one
+operational truck, an LNFS `FireAgency` entry, and two sample fire
+incidents. Re-running it creates duplicates — it's for a fresh dev/demo
+database, not a migration. It does **not** seed `WhitelistEntry`/login
+access; use the Setup Wizard's bootstrap Super Admin for that.
+
+### SMS/WhatsApp intake (stub)
+
+`POST /api/intake/case` and `POST /api/intake/fire-incident`
+(`server/src/routes/intake.routes.ts`) let a future WhatsApp Business
+API / Twilio SMS webhook create `Case`/`FireIncident` nodes with
+`status: intake_pending` / `reported` directly, without a signed-in
+clerk — matching the payload shape a citizen-facing bot would send
+(case/incident type, quarter, reporter name/phone, description, optional
+photo reference). They're disabled (`501`) until you set `INTAKE_API_KEY`
+in the server's environment; once set, callers must send it back as the
+`X-Intake-Key` header. No bot integration is wired up yet — these are
+just the receiving endpoints, ready for one.
+
 ### Adding a new district or county
 
 Per the design recap's build sequencing: no code change is required.
@@ -103,8 +170,15 @@ Per the design recap's build sequencing: no code change is required.
 
 ## Not yet built
 
-- WhatsApp/SMS intake wiring (Africa's Talking) — `CommunicationLog` is
-  ready to receive it, but the inbound webhook isn't implemented yet.
+- The actual WhatsApp Business API / Twilio SMS bot — the receiving
+  endpoints exist (see **SMS/WhatsApp intake** above) and are shaped for
+  it, but nothing calls them yet.
+- A map view of parcel boundaries — `Parcel.geometry_geojson` is there to
+  hold GeoJSON if you have surveyed geometry, but rendering it was called
+  out as a stretch goal and isn't built.
+- Photo upload — `photo_reference` fields on `PublicWorksItem` and
+  `FireIncident` store a URL/reference string; there's no upload endpoint
+  or object storage wired up to populate one yet.
 - UI for the county-scoped roles' aggregate dashboards — the API already
   scopes reads for them (`server/src/schema/roleGroups.ts`), but no
   purpose-built screen exists yet since no real county-level users are
