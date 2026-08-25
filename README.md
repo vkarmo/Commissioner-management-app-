@@ -168,6 +168,78 @@ Per the design recap's build sequencing: no code change is required.
 3. Point that office's WhatsApp/SMS intake number at the new district's
    config.
 
+## Deploying to Google Cloud Run
+
+This is a monorepo with two independently deployable apps, so it deploys
+as **two separate Cloud Run services** — each with its own `Dockerfile`
+(`server/Dockerfile`, `client/Dockerfile`). If you set up Cloud Run's
+"Continuously deploy from a repository" option and got *"We could not
+find a valid build file"*, that's why: Cloud Build was looking at the
+repo root, which has neither a `Dockerfile` nor a `cloudbuild.yaml`. Fix
+it by setting each service's **build source directory** to `server` or
+`client` respectively (Console: the build configuration step has a
+"Source location"/build context field; CLI: `--source server` /
+`--source client`, shown below).
+
+### Two things that only matter for Cloud Run, not local dev
+
+1. **The Setup Wizard's saved config won't survive.** It writes to
+   `server/data/runtime-config.json` on local disk
+   (`server/src/config/runtimeConfig.ts`) — fine for a VM or your laptop,
+   but a Cloud Run container's filesystem is ephemeral and gets thrown
+   away on every new revision, restart, or scale-to-zero cold start. On
+   Cloud Run, **configure everything via environment variables/secrets at
+   deploy time instead** (below) and skip the wizard — `.env`-style env
+   vars are read as a fallback whenever the file is empty, so this just
+   works.
+2. **`VITE_API_BASE_URL` is baked into the client at build time**, not
+   read at runtime (that's how Vite env vars work) — so the client image
+   has to be built *after* the server is deployed and its URL is known.
+
+### Deploy
+
+```bash
+# --- Server ---
+cd server
+docker build -t gcr.io/YOUR_PROJECT/commissioner-server .
+docker push gcr.io/YOUR_PROJECT/commissioner-server
+gcloud run deploy commissioner-server \
+  --image gcr.io/YOUR_PROJECT/commissioner-server \
+  --region YOUR_REGION \
+  --allow-unauthenticated \
+  --set-env-vars NEO4J_URI=neo4j+s://xxxx.databases.neo4j.io,NEO4J_USERNAME=neo4j,NEO4J_DATABASE=neo4j,GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com,BOOTSTRAP_SUPER_ADMINS=you@example.com,BOOTSTRAP_SUPER_ADMIN_COUNTY=Bomi \
+  --set-secrets NEO4J_PASSWORD=neo4j-password:latest,JWT_SECRET=jwt-secret:latest
+# Note the printed Service URL — you need it for the client build below.
+
+# --- Client (build only after you have the server's URL) ---
+cd ../client
+docker build \
+  --build-arg VITE_API_BASE_URL=https://commissioner-server-xxxx.a.run.app/api \
+  -t gcr.io/YOUR_PROJECT/commissioner-client .
+docker push gcr.io/YOUR_PROJECT/commissioner-client
+gcloud run deploy commissioner-client \
+  --image gcr.io/YOUR_PROJECT/commissioner-client \
+  --region YOUR_REGION \
+  --allow-unauthenticated
+# Note this Service URL too.
+
+# --- Wire the two together ---
+gcloud run services update commissioner-server \
+  --region YOUR_REGION \
+  --update-env-vars CORS_ORIGIN=https://commissioner-client-xxxx.a.run.app
+```
+
+`NEO4J_PASSWORD` and `JWT_SECRET` above go through
+[Secret Manager](https://cloud.google.com/secret-manager) rather than
+plain `--set-env-vars`, since Cloud Run logs/shows env var values in
+plaintext in the console; create them first with e.g.
+`echo -n 'your-password' | gcloud secrets create neo4j-password --data-file=-`.
+
+Finally, add the client's Cloud Run URL to your OAuth client's
+**Authorized JavaScript origins** in
+[Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials)
+— Google Sign-In will silently reject the origin otherwise.
+
 ## Not yet built
 
 - The actual WhatsApp Business API / Twilio SMS bot — the receiving
