@@ -1,8 +1,8 @@
-# Cloud Run monorepo note: when configuring this service's build (Cloud
-# Run "Continuously deploy from a repository", or `gcloud run deploy
-# --source`), point the build/source directory at `server/` — this
-# Dockerfile is not meant to be built from the repo root, since `client/`
-# is a separate Cloud Run service with its own Dockerfile.
+# Cloud Run monorepo note: deploy with `gcloud run deploy --source server`
+# (see README.md) — this Dockerfile is not meant to be built from the
+# repo root, since `client/` is a separate Cloud Run service with its own
+# Dockerfile. Cloud Run's "Create Service from repository" Console wizard
+# doesn't support pointing at a subdirectory of a monorepo; use the CLI.
 
 FROM node:20-alpine AS build
 WORKDIR /app
