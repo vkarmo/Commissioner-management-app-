@@ -170,41 +170,72 @@ Per the design recap's build sequencing: no code change is required.
 
 ## Deploying to Google Cloud Run
 
-This is a monorepo with two independently deployable apps, so it deploys
-as **two separate Cloud Run services** — each with its own `Dockerfile`
-(`server/Dockerfile`, `client/Dockerfile`).
+Two ways to deploy this, pick one:
+
+- **Combined (recommended, simplest)** — one Cloud Run service. The repo-root
+  `Dockerfile` builds both apps and the Express server serves the built
+  React app directly (`server/src/app.ts`), so there's one URL, no CORS
+  setup, and no client/server URL wiring at all.
+- **Split** — two Cloud Run services (`server/Dockerfile`,
+  `client/Dockerfile`), independently scalable/deployable, at the cost of
+  needing to wire `CORS_ORIGIN` and `API_BASE_URL` between them. See
+  **Split deploy** below if you want this instead.
 
 **Don't use Cloud Run's "Create Service from repository" Console
-wizard for this repo.** That wizard only ever looks at the repo root for
-a `Dockerfile`/`cloudbuild.yaml` and — at least as of writing — doesn't
-offer a way to point it at a subdirectory, so it will always fail with
-*"We could not find a valid build file"* here, no matter what's in
-`server/` or `client/`. Use the `gcloud` CLI instead (below); its
-`--source <dir>` flag builds from exactly the directory you name, no
-Console field-hunting required, and doesn't need Docker installed
-locally — Cloud Build does the build remotely.
+wizard for either.** That wizard only ever looks at the repo root for a
+`Dockerfile`/`cloudbuild.yaml` and — at least as of writing — doesn't
+support a monorepo well (no reliable way to point at a subdirectory for
+the split option), so it tends to fail with *"We could not find a valid
+build file"*. Use the `gcloud` CLI instead (below); its `--source <dir>`
+flag builds from exactly the directory you name, no Console
+field-hunting required, and doesn't need Docker installed locally —
+Cloud Build does the build remotely. (If a Console-created trigger/service
+is already stuck on this error, either delete it and redeploy with the
+command below, or fix its Cloud Build trigger's "Configuration" from
+*Autodetected* to *Dockerfile* with the right directory.)
 
-### Two things that only matter for Cloud Run, not local dev
+### One thing that only matters for Cloud Run, not local dev
 
-1. **The Setup Wizard's saved config won't survive.** It writes to
-   `server/data/runtime-config.json` on local disk
-   (`server/src/config/runtimeConfig.ts`) — fine for a VM or your laptop,
-   but a Cloud Run container's filesystem is ephemeral and gets thrown
-   away on every new revision, restart, or scale-to-zero cold start. On
-   Cloud Run, **configure everything via environment variables/secrets at
-   deploy time instead** (below) and skip the wizard — `.env`-style env
-   vars are read as a fallback whenever the file is empty, so this just
-   works.
-2. **The client learns the server's URL at container startup, not at
-   build time.** `docker-entrypoint.sh` writes it into
-   `dist/runtime-config.js` from the `API_BASE_URL` env var when the
-   container starts (`client/src/config.ts` reads it from there before
-   falling back to the build-time `VITE_API_BASE_URL` used in local dev).
-   That means the two services can be deployed in either order and
-   re-pointed at each other later with `gcloud run services update
-   --set-env-vars`, without rebuilding an image.
+**The Setup Wizard's saved config won't survive.** It writes to
+`server/data/runtime-config.json` on local disk
+(`server/src/config/runtimeConfig.ts`) — fine for a VM or your laptop,
+but a Cloud Run container's filesystem is ephemeral and gets thrown away
+on every new revision, restart, or scale-to-zero cold start. On Cloud
+Run, **configure everything via environment variables/secrets at deploy
+time instead** (below) and skip the wizard — `.env`-style env vars are
+read as a fallback whenever the file is empty, so this just works.
 
-### Deploy
+### Combined deploy
+
+```bash
+gcloud run deploy commissionerappservice \
+  --source . \
+  --region YOUR_REGION \
+  --allow-unauthenticated \
+  --set-env-vars NEO4J_URI=neo4j+s://xxxx.databases.neo4j.io,NEO4J_USERNAME=neo4j,NEO4J_DATABASE=neo4j,GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com,BOOTSTRAP_SUPER_ADMINS=you@example.com,BOOTSTRAP_SUPER_ADMIN_COUNTY=Bomi \
+  --set-secrets NEO4J_PASSWORD=neo4j-password:latest,JWT_SECRET=jwt-secret:latest
+```
+
+That's it — one service, one URL. No `CORS_ORIGIN` or `API_BASE_URL`
+needed, since the client is served from the same origin it calls
+(`client/src/config.ts` defaults to a relative `/api`). Once it's up, add
+its URL to your OAuth client's **Authorized JavaScript origins** in
+[Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials)
+— Google Sign-In will silently reject the origin otherwise.
+
+`--source .` requires the [gcloud CLI](https://cloud.google.com/sdk/docs/install)
+(`gcloud auth login`, `gcloud config set project YOUR_PROJECT` first) —
+it uploads the repo and has Cloud Build build+push the image for you,
+then deploys it. `NEO4J_PASSWORD` and `JWT_SECRET` above go through
+[Secret Manager](https://cloud.google.com/secret-manager) rather than
+plain `--set-env-vars`, since Cloud Run logs/shows env var values in
+plaintext in the console; create them first with e.g.
+`echo -n 'your-password' | gcloud secrets create neo4j-password --data-file=-`.
+
+To redeploy after a code change, just re-run the same command (add
+`--set-env-vars`/`--update-env-vars` only if something changed).
+
+### Split deploy
 
 ```bash
 # --- Server ---
@@ -230,19 +261,14 @@ gcloud run services update commissioner-server \
   --update-env-vars CORS_ORIGIN=https://commissioner-client-xxxx.a.run.app
 ```
 
-`--source <dir>` requires the [gcloud CLI](https://cloud.google.com/sdk/docs/install)
-(`gcloud auth login`, `gcloud config set project YOUR_PROJECT` first) —
-it uploads that directory and has Cloud Build build+push the image for
-you, then deploys it. `NEO4J_PASSWORD` and `JWT_SECRET` above go through
-[Secret Manager](https://cloud.google.com/secret-manager) rather than
-plain `--set-env-vars`, since Cloud Run logs/shows env var values in
-plaintext in the console; create them first with e.g.
-`echo -n 'your-password' | gcloud secrets create neo4j-password --data-file=-`.
-
-Finally, add the client's Cloud Run URL to your OAuth client's
-**Authorized JavaScript origins** in
-[Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials)
-— Google Sign-In will silently reject the origin otherwise.
+The client learns the server's URL at container startup, not build time:
+`docker-entrypoint.sh` writes it into `dist/runtime-config.js` from the
+`API_BASE_URL` env var when the container starts, and `client/src/config.ts`
+reads it from there. That means the two services can be deployed in
+either order and re-pointed at each other later with `gcloud run
+services update --update-env-vars`, without rebuilding an image. Same
+Secret Manager and OAuth-origin notes as the combined deploy above apply
+here too (use the *client's* URL for the OAuth origin, not the server's).
 
 ## Not yet built
 
