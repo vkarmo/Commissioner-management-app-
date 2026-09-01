@@ -25,3 +25,21 @@ export function referToAgency(incidentId: string, fireAgencyId: string, notes?: 
     notes,
   });
 }
+
+export function dispatchScout(incidentId: string, scoutType: "Person" | "Official", scoutId: string) {
+  return api.post<{ item: Record<string, unknown> }>(`/fire-incidents/${incidentId}/dispatch-scout`, {
+    scoutType,
+    scoutId,
+  });
+}
+
+export interface ScoutReportPayload {
+  result: "confirmed" | "false_alarm";
+  severity?: "minor" | "moderate" | "severe";
+  channel: "whatsapp" | "radio";
+  notes?: string;
+}
+
+export function submitScoutReport(incidentId: string, payload: ScoutReportPayload) {
+  return api.post<{ item: Record<string, unknown> }>(`/fire-incidents/${incidentId}/scout-report`, payload);
+}

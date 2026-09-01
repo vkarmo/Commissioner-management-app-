@@ -383,6 +383,13 @@ button[type="submit"],
   font-size: 0.95rem;
 }
 
+.fire-actions-subheading {
+  margin: 0.75rem 0 0.3rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
 .fire-actions-block textarea {
   width: 100%;
   margin-top: 0.5rem;

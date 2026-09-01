@@ -49,6 +49,20 @@ two actions instead of one:
   capacity); creates `REFERRED_TO` a `FireAgency` plus a `CommunicationLog`
   entry linked via `LINKED_TO`, and advances status to `referred_to_lnfs`.
 
+A third, always-available action sits alongside those two:
+
+- **Dispatch Scout** — sends a specific `Person` or `Official` (e.g. a
+  motorbike scout) to confirm what's actually happening before a truck
+  rolls or a referral is made; creates a `SCOUTED` relationship and
+  advances status to `scout_dispatched`. It's optional and doesn't gate
+  the other two — a clerk can still Respond Locally or Refer to LNFS at
+  any time regardless of whether a scout was sent.
+- **Log Scout Report** — once the scout calls in (radio or WhatsApp),
+  records the result (confirmed/false alarm), an optional severity, and
+  notes as a `CommunicationLog` entry linked via `LINKED_TO`. A false
+  alarm auto-resolves the incident; a confirmed severity is written back
+  onto `FireIncident.severity` so it's visible without opening the log.
+
 Intake also suggests the nearest known water point (`NEAR` a
 `PublicWorksItem` of category `water_point`) for community bucket-brigade
 guidance — by GPS distance where both records have coordinates, falling

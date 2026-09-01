@@ -189,6 +189,10 @@ export const RESOURCES: Record<string, ResourceDef> = {
     { key: "status", type: "string", required: true },
     { key: "casualties", type: "string" },
     { key: "estimated_damage", type: "string" },
+    // Set by the scout-report action (minor | moderate | severe), or
+    // editable by hand; visible on the incident so a clerk can triage
+    // without opening every linked CommunicationLog entry.
+    { key: "severity", type: "string" },
     { key: "description", type: "string" },
     { key: "photo_reference", type: "string" },
     { key: "gps_lat", type: "number" },
@@ -316,6 +320,8 @@ export const RELATIONSHIPS: RelationshipDef[] = [
   { type: "REFERRED_TO", from: "FireIncident", to: "FireAgency" },
   { type: "LINKED_TO", from: "FireIncident", to: "CommunicationLog" },
   { type: "LOGGED", from: "Official", to: "FireIncident" },
+  { type: "SCOUTED", from: "Person", to: "FireIncident" },
+  { type: "SCOUTED", from: "Official", to: "FireIncident" },
 
   { type: "ALLOCATED_TO", from: "Budget", to: "BudgetLineItem" },
   { type: "FUNDS", from: "BudgetLineItem", to: "PublicWorksItem" },
