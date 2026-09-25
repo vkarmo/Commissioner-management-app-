@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ApiError } from "../api/client";
 import {
   runLineItemDrift,
+  runLocationMismatches,
   runQuartersLeftOut,
   runRepeatLandCases,
   runUnapprovedDisbursements,
@@ -147,6 +148,47 @@ const CHECKS: CheckDef[] = [
         </tbody>
       </table>
     ),
+  },
+  {
+    key: "location-mismatches",
+    title: "Location mismatches",
+    description:
+      "Case/Parcel/PublicWorksItem/FireIncident records where the quarter name and the linked Quarter disagree, or only one of the two is set.",
+    run: runLocationMismatches,
+    render: (findings) => {
+      const linkPath: Record<string, string> = {
+        Case: "cases",
+        Parcel: "parcels",
+        PublicWorksItem: "public-works",
+        FireIncident: "fire-incidents",
+      };
+      return (
+        <table className="record-table">
+          <thead>
+            <tr>
+              <th>Record</th>
+              <th>Quarter string</th>
+              <th>Linked Quarter</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {findings.map((f) => (
+              <tr key={f.node_id as string}>
+                <td>{f.label as string}</td>
+                <td>{(f.quarter_string as string) || "(none)"}</td>
+                <td>{(f.located_in_quarter_name as string) || "(none)"}</td>
+                <td>
+                  {linkPath[f.label as string] && (
+                    <Link to={`/${linkPath[f.label as string]}/${f.node_id}`}>View</Link>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      );
+    },
   },
 ];
 

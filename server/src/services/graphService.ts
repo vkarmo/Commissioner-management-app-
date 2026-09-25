@@ -237,6 +237,37 @@ export async function archiveNode(resource: ResourceName, id: string, scope: Sco
   });
 }
 
+/**
+ * Relationship-specific invariants that must hold no matter which route
+ * calls relate() (Phase 1, schema-patch spec 2026-09-25). Centralized here
+ * — the single chokepoint for every relationship write — rather than
+ * duplicated in each route, so they can't drift out of sync.
+ */
+function relationshipSideEffects(type: string, fromResource: ResourceName, toResource: ResourceName) {
+  // 1.3: LOCATED_IN to a Quarter makes the edge authoritative over the
+  // node's `quarter` string cache. A node has at most one LOCATED_IN
+  // Quarter, so re-relating to a different one first drops the stale edge.
+  if (type === "LOCATED_IN" && toResource === "Quarter" && getResourceDef(fromResource).properties.some((p) => p.key === "quarter")) {
+    return {
+      dropStaleEdge: `MATCH (a)-[old:LOCATED_IN]->(oldQ:Quarter) WHERE oldQ.id <> $toId DELETE old`,
+      setClause: `SET a.quarter = b.name, a.updated_at = $now`,
+    };
+  }
+  // 1.2: CHIEF_OF makes the edge authoritative over Quarter.chief_name/
+  // chief_phone and Person.is_quarter_chief. A quarter has at most one
+  // current chief, so replacing it clears the previous chief's flag too.
+  if (type === "CHIEF_OF" && fromResource === "Person" && toResource === "Quarter") {
+    return {
+      dropStaleEdge: `MATCH (oldChief:Person)-[old:CHIEF_OF]->(b) WHERE oldChief.id <> $fromId
+                      SET oldChief.is_quarter_chief = false, oldChief.updated_at = $now
+                      DELETE old`,
+      setClause: `SET b.chief_name = a.full_name, b.chief_phone = a.phone, b.updated_at = $now,
+                       a.is_quarter_chief = true, a.updated_at = $now`,
+    };
+  }
+  return { dropStaleEdge: "", setClause: "" };
+}
+
 export async function relate(
   type: string,
   fromResource: ResourceName,
@@ -252,18 +283,35 @@ export async function relate(
   const toDef = getResourceDef(toResource);
   const fromScopeClause = scopeClause(fromResource, scope);
   const toScopeClause = scopeClause(toResource, scope);
+  const { dropStaleEdge, setClause } = relationshipSideEffects(type, fromResource, toResource);
 
   const session = getSession("WRITE");
   try {
-    const result = await session.run(
-      `MATCH (a:${fromDef.label} {id: $fromId}) WHERE true ${fromScopeClause.clause.replace(/n\./g, "a.")}
+    const now = new Date().toISOString();
+    const matchClause = `
+       MATCH (a:${fromDef.label} {id: $fromId}) WHERE true ${fromScopeClause.clause.replace(/n\./g, "a.")}
        MATCH (b:${toDef.label} {id: $toId}) WHERE true ${toScopeClause.clause.replace(/n\./g, "b.")}
+         AND (a.county IS NULL OR b.county IS NULL OR a.county = b.county)
+         AND (a.district IS NULL OR b.district IS NULL OR a.district = b.district)`;
+    const params = { fromId, toId, now, ...fromScopeClause.params, ...toScopeClause.params };
+
+    // Same-scope rule (Conventions, schema-patch spec): reject any
+    // relationship whose two endpoints have different county/district —
+    // Quarter etc. count as in-scope purely by property match since they
+    // aren't `scoped` resources themselves.
+    if (dropStaleEdge) {
+      await session.run(`${matchClause} ${dropStaleEdge}`, params);
+    }
+
+    const result = await session.run(
+      `${matchClause}
        MERGE (a)-[r:${type}]->(b)
+       ${setClause}
        RETURN a, b`,
-      { fromId, toId, ...fromScopeClause.params, ...toScopeClause.params },
+      params,
     );
     if (result.records.length === 0) {
-      throw new NotFoundError("One or both endpoints not found or out of scope");
+      throw new NotFoundError("One or both endpoints not found, out of scope, or in a different county/district");
     }
     return { ok: true };
   } finally {

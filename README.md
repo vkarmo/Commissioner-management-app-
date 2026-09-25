@@ -76,7 +76,7 @@ A read-only, schema-free layer of checks over the existing graph
 nodes or relationships, just Cypher queries surfaced as an **Analysis**
 screen (Commissioner/Official/SuperAdmin only, since findings can name
 specific people). This is being built out in phases from a separate
-schema-patch spec; Phase 0 (current) covers:
+schema-patch spec; Phase 0 covers:
 
 | Check | What it flags |
 |---|---|
@@ -84,6 +84,28 @@ schema-patch spec; Phase 0 (current) covers:
 | `line-item-drift` | Budget lines over-disbursed, over-spent, or disbursed but never spent |
 | `unapproved-disbursements` | Disbursements from a budget with no approved `ApprovalAction` |
 | `repeat-land-cases` | Parcels with more than one land case against them |
+
+**Phase 1** (current) added one more check plus two clerk-facing cleanup
+tools:
+
+| Check | What it flags |
+|---|---|
+| `location-mismatches` | Case/Parcel/PublicWorksItem/FireIncident whose `quarter` string and linked Quarter disagree, or where only one of the two is set |
+
+- **Migrations** (`server/src/migrations/`, `npm run migrate:m1` /
+  `migrate:m2`): non-destructive, idempotent scripts that link
+  `Person.quarter` strings to real Quarter nodes (`LIVES_IN`) and dedupe
+  quarter chiefs onto a single `CHIEF_OF` edge, reporting anything
+  ambiguous instead of guessing. Run against a seeded local database
+  first — never against production without asking.
+- **Case Party Review** (`/case-party-review`, Clerk and up): a queue for
+  turning SMS/WhatsApp intake's free-text reporter/respondent names into
+  real Person links — a clerk always confirms a suggested match or adds a
+  new person; nothing auto-links on name alone.
+
+1.5 (retiring the `Dispute` node in favor of `Case{type: 'land'}`) is
+**not** implemented — the spec itself flags that as needing a decision
+from the office first.
 
 See [`docs/graph-schema.md`](docs/graph-schema.md) for the full generated
 schema reference (regenerated at the end of every phase).

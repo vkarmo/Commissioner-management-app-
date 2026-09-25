@@ -7,7 +7,14 @@ phase, even phases (like Phase 0) that don't touch it.
 
 **Phase 0** (2026-09-25) added a read-only analysis layer
 (`GET /api/analysis/*`, `server/src/routes/analysis.routes.ts`) with no
-schema changes — the tables below are unchanged from before it landed.
+schema changes.
+
+**Phase 1** (2026-09-25) added the `LIVES_IN` and `CHIEF_OF` relationships,
+deprecated three now-derived properties, and added a same-scope guard plus
+two derived-field syncs to `graphService.relate()` — see "Migrations
+(Phase 1)" and "Case Party Review (Phase 1.4)" below. 1.5 (retiring
+`Dispute`) is **not** implemented — the spec itself flags it as needing an
+office decision first.
 
 This is a **property graph** (Neo4j), not a relational schema — nodes
 carry properties directly (no separate columns/tables), and relationships
@@ -60,14 +67,14 @@ keys, only graph relationships.
 | `county` | string | yes |
 
 **Quarter**
-| Property | Type | Required |
-|---|---|---|
-| `name` | string | yes |
-| `district` | string | yes |
-| `county` | string | yes |
-| `chief_name` | string | no |
-| `chief_phone` | string | no |
-| `population` | number | no |
+| Property | Type | Required | Notes |
+|---|---|---|---|
+| `name` | string | yes | |
+| `district` | string | yes | |
+| `county` | string | yes | |
+| `chief_name` | string | no | **deprecated** — derived from the quarter's `CHIEF_OF` Person once that edge exists (Phase 1 M2) |
+| `chief_phone` | string | no | **deprecated** — same as `chief_name` |
+| `population` | number | no | |
 
 ### Admin / auth (unscoped)
 
@@ -102,7 +109,7 @@ keys, only graph relationships.
 | `phone` | string | no | |
 | `quarter` | string | no | |
 | `role` | string | no | citizen \| official \| clerk |
-| `is_quarter_chief` | boolean | no | |
+| `is_quarter_chief` | boolean | no | **deprecated** — derived from a `CHIEF_OF` edge to a Quarter once that edge exists (Phase 1 M2) |
 | `notes` | string | no | |
 
 **Case**
@@ -304,6 +311,8 @@ keys, only graph relationships.
 |---|---|---|
 | `WITHIN` | District | County |
 | `WITHIN` | Quarter | District |
+| `LIVES_IN` | Person | Quarter |
+| `CHIEF_OF` | Person | Quarter |
 | `FILED` | Person | Case |
 | `NAMED_IN` | Person | Case |
 | `INVOLVES` | Case | Person |
@@ -346,6 +355,22 @@ in `resources.ts`) — the API rejects any relationship type/from/to
 combination not in this table, so it's exhaustive; nothing else can
 exist in the live database via the API.
 
+**Same-scope rule** (Phase 1): `graphService.relate()` rejects any
+relationship whose two endpoints have different `county`/`district`
+values — Quarter/District/County count as in-scope purely by matching
+property values, since they aren't `scoped` resources themselves.
+
+**Derived fields on write** (Phase 1): `relate()` also keeps two things in
+sync so they can't drift, no matter which route creates the edge:
+- `LOCATED_IN` to a Quarter (Case/Parcel/PublicWorksItem/FireIncident) sets
+  the node's `quarter` string from the Quarter's `name`, and drops any
+  previous `LOCATED_IN` edge to a different Quarter — the edge is
+  authoritative, the string is a read-only cache.
+- `CHIEF_OF` (Person → Quarter) sets `Quarter.chief_name`/`chief_phone`
+  from the Person, sets `Person.is_quarter_chief = true`, and un-sets the
+  previous chief's flag if there was one — a Quarter has at most one
+  current `CHIEF_OF` Person.
+
 ---
 
 ## Analysis layer (Phase 0, read-only, no schema changes)
@@ -361,10 +386,48 @@ Clerk is excluded). Each check returns `{ check, generated_at, findings }`.
 | `line-item-drift` | Budget lines over-disbursed, over-spent relative to disbursed, or disbursed but never spent |
 | `unapproved-disbursements` | Disbursements from a budget with no approved `ApprovalAction` |
 | `repeat-land-cases` | Parcels with more than one `Case{type:'land'}` against them (basic version — Phase 3 adds families/witnesses) |
+| `location-mismatches` | Case/Parcel/PublicWorksItem/FireIncident whose `quarter` string and `LOCATED_IN` Quarter disagree, or where only one of the two is set (Phase 1.3) |
 
-Tests: `server/test/analysis.phase0.test.ts` (`npm test` in `server/`) —
-requires `server/.env.test` pointed at a disposable Neo4j instance (see
-`server/.env.test.example`); skips cleanly if not configured.
+Tests: `server/test/analysis.phase0.test.ts` and
+`server/test/analysis.phase1.test.ts` (`npm test` in `server/`) — require
+`server/.env.test` pointed at a disposable Neo4j instance (see
+`server/.env.test.example`); skip cleanly if not configured.
+
+---
+
+## Migrations (Phase 1)
+
+Non-destructive, idempotent scripts under `server/src/migrations/`. Each
+only adds edges (never deletes or overwrites existing data) and reports
+anything ambiguous instead of guessing. Run against a seeded local
+database first — ask before running against a real one.
+
+| Script | npm script | What it does |
+|---|---|---|
+| `m1PersonLivesInQuarter.ts` | `npm run migrate:m1` | Links each `Person.quarter` string to a same-name Quarter (same county/district) via `LIVES_IN`. Unmatched/ambiguous names are reported, never guessed; Quarters are never auto-created. |
+| `m2QuarterChiefs.ts` | `npm run migrate:m2` | Links each `Person.is_quarter_chief = true` to their Quarter (via an existing `LIVES_IN` edge, or M1's name-match) via `CHIEF_OF` — run M1 first. Reports a Quarter whose `chief_name` has no matching `CHIEF_OF` Person, without auto-creating one. |
+
+Both scripts return a structured report (`{ scanned/linked, unmatched,
+ambiguous }` for M1; `{ personsScanned/linked, personReview,
+quarterMismatches }` for M2) in addition to printing it, and are covered
+by `server/test/analysis.phase1.test.ts`.
+
+**Not implemented (1.5):** retiring `Dispute` in favor of `Case{type:
+'land'}` — the spec flags this as needing an office decision first.
+
+## Case Party Review (Phase 1.4)
+
+`GET /api/case-party-review` (Clerk/Official/Commissioner/SuperAdmin) —
+lists cases that are `intake_pending`, or have a `reporter_name`/
+`respondent_name` from SMS/WhatsApp intake with no matching `FILED`/
+`INVOLVES` edge yet, alongside candidate Person matches (same
+county/district, by phone first then by name). Nothing here auto-links on
+a name match — a clerk always confirms:
+
+- `POST /:caseId/confirm` `{ field: 'reporter'|'respondent', personId }` —
+  creates `FILED` (reporter) or `INVOLVES` (respondent).
+- `POST /:caseId/new-person` `{ field, full_name, phone? }` — creates a
+  new Person in the case's scope, then links it the same way.
 
 ---
 

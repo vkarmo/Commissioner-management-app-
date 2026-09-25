@@ -9,6 +9,7 @@ import { ResourceFormPage } from "./pages/ResourceFormPage";
 import { ConflictsPage } from "./pages/ConflictsPage";
 import { CommunityRegistryPage } from "./pages/CommunityRegistryPage";
 import { AnalysisPage } from "./pages/AnalysisPage";
+import { CasePartyReviewPage } from "./pages/CasePartyReviewPage";
 import { AdminWhitelistPage } from "./pages/AdminWhitelistPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SetupWizard } from "./pages/SetupWizard";
@@ -41,6 +42,7 @@ function AppRoutes() {
         <Route index element={<Dashboard />} />
         <Route path="community" element={<CommunityRegistryPage />} />
         <Route path="analysis" element={<AnalysisPage />} />
+        <Route path="case-party-review" element={<CasePartyReviewPage />} />
         <Route path="conflicts" element={<ConflictsPage />} />
         <Route path="admin/whitelist" element={<AdminWhitelistPage />} />
         <Route path="admin/settings" element={<SettingsPage />} />

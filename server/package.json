@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "seed": "tsx src/seed.ts",
+    "migrate:m1": "tsx src/migrations/m1PersonLivesInQuarter.ts",
+    "migrate:m2": "tsx src/migrations/m2QuarterChiefs.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
