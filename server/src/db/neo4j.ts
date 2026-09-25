@@ -6,7 +6,16 @@ let driver: Driver | null = null;
 export function getDriver(): Driver {
   if (!driver) {
     const config = getConfig();
-    driver = neo4j.driver(config.neo4jUri, neo4j.auth.basic(config.neo4jUsername, config.neo4jPassword));
+    driver = neo4j.driver(config.neo4jUri, neo4j.auth.basic(config.neo4jUsername, config.neo4jPassword), {
+      // Analysis queries (server/src/routes/analysis.routes.ts) aggregate
+      // with count()/sum()/size(), which Cypher always returns as its
+      // 64-bit Integer type regardless of the underlying property type.
+      // Without this, those come back as neo4j-driver Integer objects
+      // that don't serialize to plain numbers over JSON. Every amount in
+      // this app is well within JS's safe integer range, so there's no
+      // precision tradeoff in disabling lossless integers app-wide.
+      disableLosslessIntegers: true,
+    });
   }
   return driver;
 }

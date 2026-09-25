@@ -4,6 +4,7 @@ import { useAuth } from "../auth/AuthContext";
 import { OfflineIndicator } from "./OfflineIndicator";
 
 const ADMIN_ROLES = new Set(["SuperAdmin", "CountySuperAdmin"]);
+const ANALYSIS_ROLES = new Set(["Commissioner", "Official", "SuperAdmin"]);
 
 export function Layout() {
   const { user, logout } = useAuth();
@@ -38,6 +39,7 @@ export function Layout() {
           })}
           <div className="nav-group">
             <span className="nav-group-label">System</span>
+            {user && ANALYSIS_ROLES.has(user.role) && <NavLink to="/analysis">Analysis</NavLink>}
             <NavLink to="/conflicts">Sync Conflicts</NavLink>
             {user && ADMIN_ROLES.has(user.role) && <NavLink to="/admin/whitelist">Whitelist</NavLink>}
             {user && ADMIN_ROLES.has(user.role) && <NavLink to="/admin/settings">Settings</NavLink>}

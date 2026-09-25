@@ -9,6 +9,7 @@ import { fireIncidentActionsRouter } from "./fireIncidentActions.routes.js";
 import { landRecordsRouter } from "./landRecords.routes.js";
 import { communityRouter } from "./community.routes.js";
 import { intakeRouter } from "./intake.routes.js";
+import { analysisRouter } from "./analysis.routes.js";
 import { OFFICE_STAFF, COUNTY_AGGREGATE_READERS, COUNTY_FINANCE } from "../schema/roleGroups.js";
 
 export const apiRouter = Router();
@@ -20,6 +21,7 @@ apiRouter.use("/relate", relateRouter);
 apiRouter.use("/sync", syncRouter);
 apiRouter.use("/intake", intakeRouter);
 apiRouter.use("/community", communityRouter);
+apiRouter.use("/analysis", analysisRouter);
 
 // The original 7-module schema: office business only, per design recap §4
 // ("county-scoped roles ... not case/land detail").
