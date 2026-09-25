@@ -69,6 +69,25 @@ guidance — by GPS distance where both records have coordinates, falling
 back to same-quarter matching otherwise
 (`server/src/routes/fireIncidentActions.routes.ts`).
 
+### Analysis layer
+
+A read-only, schema-free layer of checks over the existing graph
+(`GET /api/analysis/*`, `server/src/routes/analysis.routes.ts`) — no new
+nodes or relationships, just Cypher queries surfaced as an **Analysis**
+screen (Commissioner/Official/SuperAdmin only, since findings can name
+specific people). This is being built out in phases from a separate
+schema-patch spec; Phase 0 (current) covers:
+
+| Check | What it flags |
+|---|---|
+| `quarters-left-out` | Quarters with no public works item in 3 years and no budget line targeting them |
+| `line-item-drift` | Budget lines over-disbursed, over-spent, or disbursed but never spent |
+| `unapproved-disbursements` | Disbursements from a budget with no approved `ApprovalAction` |
+| `repeat-land-cases` | Parcels with more than one land case against them |
+
+See [`docs/graph-schema.md`](docs/graph-schema.md) for the full generated
+schema reference (regenerated at the end of every phase).
+
 ## Architecture at a glance
 
 - **Graph model**: Neo4j nodes per the module table above. Full schema
@@ -116,6 +135,21 @@ cp .env.example .env   # only needs VITE_API_BASE_URL if the server isn't at loc
 npm install
 npm run dev              # http://localhost:5173
 ```
+
+### Tests
+
+```bash
+cd server
+cp .env.test.example .env.test   # point at a DISPOSABLE Neo4j instance — never production
+npm install
+npm test
+```
+
+Integration tests (`server/test/`) seed real fixture data and hit the
+real API over HTTP, so they need their own database — never point
+`.env.test` at the same instance as `.env`. If `.env.test` is missing or
+incomplete, the suite skips itself with a clear message instead of
+risking a silent fall-through to real credentials (`server/test/testEnv.ts`).
 
 ### Setup Wizard
 
