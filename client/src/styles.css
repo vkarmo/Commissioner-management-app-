@@ -447,3 +447,51 @@ button[type="submit"],
   overflow-x: auto;
   font-size: 0.8rem;
 }
+
+.review-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.25rem;
+  max-width: 720px;
+  margin-top: 1.5rem;
+}
+
+.party-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.party-section h4 {
+  margin: 0 0 0.3rem;
+  font-size: 0.95rem;
+}
+
+.candidate-list {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+}
+
+.candidate-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.inline-form {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 0.4rem;
+}
+
+.inline-form input {
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}

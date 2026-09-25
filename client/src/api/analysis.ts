@@ -21,3 +21,7 @@ export function runUnapprovedDisbursements() {
 export function runRepeatLandCases() {
   return api.get<CheckResult>("/analysis/repeat-land-cases");
 }
+
+export function runLocationMismatches() {
+  return api.get<CheckResult>("/analysis/location-mismatches");
+}

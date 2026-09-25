@@ -143,6 +143,38 @@ analysisRouter.get("/repeat-land-cases", async (req, res) => {
   res.json(result);
 });
 
+// --- 1.3 location-mismatches ---------------------------------------------
+// Phase 1 (schema-patch spec, 2026-09-25): Case/Parcel/PublicWorksItem/
+// FireIncident store location both as a `quarter` string and as a
+// LOCATED_IN edge. graphService.relate() keeps the two in sync going
+// forward (see relationshipSideEffects there), but this surfaces anything
+// already out of step — from data entered before that sync existed, or
+// entered directly without going through relate() at all.
+function locationMismatchQuery(label: string): string {
+  return `
+    MATCH (n:${label} {county: $county, district: $district}) WHERE n.archived = false
+    OPTIONAL MATCH (n)-[:LOCATED_IN]->(q:Quarter) WHERE q.archived = false
+    WITH n, q, '${label}' AS label
+    WHERE (n.quarter IS NOT NULL AND trim(n.quarter) <> '' AND q IS NULL)
+       OR (q IS NOT NULL AND (n.quarter IS NULL OR trim(n.quarter) = ''))
+       OR (q IS NOT NULL AND n.quarter IS NOT NULL AND trim(toLower(n.quarter)) <> trim(toLower(q.name)))
+    RETURN n.id AS node_id, label, n.quarter AS quarter_string,
+           q.id AS located_in_quarter_id, q.name AS located_in_quarter_name
+  `;
+}
+
+const LOCATION_MISMATCH_LABELS = ["Case", "Parcel", "PublicWorksItem", "FireIncident"];
+
+analysisRouter.get("/location-mismatches", async (req, res) => {
+  const scope = scopeFromRequest(req);
+  const result = await runCheck(
+    "location-mismatches",
+    LOCATION_MISMATCH_LABELS.map(locationMismatchQuery).join("\nUNION ALL\n"),
+    { county: scope.county, district: scope.district },
+  );
+  res.json(result);
+});
+
 // Exported for the Phase 0 test suite (avoids re-deriving "today" with a
 // slightly different clock read than the routes above used).
 export const analysisDateHelpers = { todayISODate, yearsAgoISODate };

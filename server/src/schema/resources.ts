@@ -19,6 +19,13 @@ export interface PropertyDef {
   key: string;
   type: PropertyType;
   required?: boolean;
+  /**
+   * Kept for backward compatibility (older clients, existing data) but no
+   * longer the source of truth — the server derives it from a relationship
+   * on write (see graphService.relate()) and it can be overwritten there.
+   */
+  deprecated?: boolean;
+  deprecatedNote?: string;
 }
 
 export interface ResourceDef {
@@ -68,8 +75,21 @@ export const RESOURCES: Record<string, ResourceDef> = {
     { key: "district", type: "string", required: true },
     { key: "county", type: "string", required: true },
     // Community Registry (build prompt §3): basic per-quarter directory data.
-    { key: "chief_name", type: "string" },
-    { key: "chief_phone", type: "string" },
+    // Deprecated by Phase 1 M2 (schema-patch spec, 2026-09-25): once a
+    // CHIEF_OF edge exists for this quarter, these are derived from it on
+    // every write, so they can no longer drift from Person data.
+    {
+      key: "chief_name",
+      type: "string",
+      deprecated: true,
+      deprecatedNote: "Derived from the quarter's CHIEF_OF Person once that edge exists.",
+    },
+    {
+      key: "chief_phone",
+      type: "string",
+      deprecated: true,
+      deprecatedNote: "Derived from the quarter's CHIEF_OF Person once that edge exists.",
+    },
     { key: "population", type: "number" },
   ]),
 
@@ -99,7 +119,15 @@ export const RESOURCES: Record<string, ResourceDef> = {
     { key: "phone", type: "string" },
     { key: "quarter", type: "string" },
     { key: "role", type: "string" }, // citizen | official | clerk
-    { key: "is_quarter_chief", type: "boolean" },
+    // Deprecated by Phase 1 M2 (schema-patch spec, 2026-09-25): set from the
+    // CHIEF_OF edge on write instead of edited directly, once that edge
+    // exists — see graphService.relate().
+    {
+      key: "is_quarter_chief",
+      type: "boolean",
+      deprecated: true,
+      deprecatedNote: "Derived from a CHIEF_OF edge to a Quarter once that edge exists.",
+    },
     { key: "notes", type: "string" },
   ]),
   Case: resource("Case", true, [
@@ -291,6 +319,13 @@ export interface RelationshipDef {
 export const RELATIONSHIPS: RelationshipDef[] = [
   { type: "WITHIN", from: "District", to: "County" },
   { type: "WITHIN", from: "Quarter", to: "District" },
+
+  // Phase 1 (schema-patch spec, 2026-09-25): 1.1 makes the existing
+  // Person.quarter string an edge; 1.2 makes chief data an edge instead of
+  // duplicated Quarter/Person properties. Both are derived/kept consistent
+  // by graphService.relate() rather than left to callers.
+  { type: "LIVES_IN", from: "Person", to: "Quarter" },
+  { type: "CHIEF_OF", from: "Person", to: "Quarter" },
 
   { type: "FILED", from: "Person", to: "Case" },
   { type: "NAMED_IN", from: "Person", to: "Case" },
