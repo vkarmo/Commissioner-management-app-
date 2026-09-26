@@ -127,6 +127,10 @@ export const MODULES: ResourceModule[] = [
       { key: "status", label: "Status", type: "select", required: true, options: ["open", "resolved"] },
       { key: "notes", label: "Notes", type: "textarea" },
     ],
+    // Retired (Phase 1.5, schema-patch spec): file a Case with type
+    // "land" for a new land dispute instead. Existing Disputes are still
+    // viewable/editable here until migration M4 has replaced them.
+    createDisabled: "Land disputes are now tracked as Cases. Open Case Tracker and file a new Case with type “land” instead.",
   },
   {
     key: "public-works",

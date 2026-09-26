@@ -20,6 +20,15 @@ export function ResourceFormPage() {
 
   if (!module) return <p>Unknown module.</p>;
 
+  if (isNew && module.createDisabled) {
+    return (
+      <div>
+        <h1>New {module.label.replace(/s$/, "")}</h1>
+        <p className="form-error">{module.createDisabled}</p>
+      </div>
+    );
+  }
+
   return (
     <div>
       <h1>
