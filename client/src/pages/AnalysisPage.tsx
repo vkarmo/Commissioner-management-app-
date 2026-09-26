@@ -6,6 +6,7 @@ import {
   runLocationMismatches,
   runQuartersLeftOut,
   runRepeatLandCases,
+  runStalledContractors,
   runUnapprovedDisbursements,
   type CheckResult,
 } from "../api/analysis";
@@ -142,6 +143,40 @@ const CHECKS: CheckDef[] = [
               <td>{(f.parties as string[]).join(", ")}</td>
               <td>
                 <Link to={`/parcels/${f.parcel_id}`}>View</Link>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    ),
+  },
+  {
+    key: "stalled-contractors",
+    title: "Stalled contractors",
+    description: "Contractors with 2+ overdue public works items, and how much has already been paid on them.",
+    run: runStalledContractors,
+    render: (findings) => (
+      <table className="record-table">
+        <thead>
+          <tr>
+            <th>Contractor</th>
+            <th>Overdue items</th>
+            <th>Paid on overdue items</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {findings.map((f) => (
+            <tr key={f.contractor_id as string}>
+              <td>{f.name as string}</td>
+              <td>
+                {(f.overdue_items as Array<{ id: string; title: string; status: string }>)
+                  .map((i) => `${i.title} (${i.status})`)
+                  .join(", ")}
+              </td>
+              <td>{money(f.paid_on_overdue_items)}</td>
+              <td>
+                <Link to={`/contractors/${f.contractor_id}`}>View</Link>
               </td>
             </tr>
           ))}

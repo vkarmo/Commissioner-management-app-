@@ -11,6 +11,8 @@ import { communityRouter } from "./community.routes.js";
 import { intakeRouter } from "./intake.routes.js";
 import { analysisRouter } from "./analysis.routes.js";
 import { casePartyReviewRouter } from "./casePartyReview.routes.js";
+import { contractorReviewRouter } from "./contractorReview.routes.js";
+import { contractorLinksRouter } from "./contractorLinks.routes.js";
 import { OFFICE_STAFF, COUNTY_AGGREGATE_READERS, COUNTY_FINANCE } from "../schema/roleGroups.js";
 
 export const apiRouter = Router();
@@ -103,3 +105,10 @@ apiRouter.use(
   "/approval-actions",
   createResourceRouter("ApprovalAction", { readRoles: budgetReadRoles, writeRoles: budgetWriteRoles }),
 );
+// Phase 2 (schema-patch spec): the project money trail — built by/paid to.
+apiRouter.use(
+  "/contractors",
+  createResourceRouter("Contractor", { readRoles: budgetReadRoles, writeRoles: budgetWriteRoles }),
+);
+apiRouter.use("/contractor-review", contractorReviewRouter);
+apiRouter.use(contractorLinksRouter);
