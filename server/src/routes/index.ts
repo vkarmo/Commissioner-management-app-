@@ -48,7 +48,17 @@ apiRouter.use(
 apiRouter.use("/officials", createResourceRouter("Official", { readRoles: OFFICE_STAFF, writeRoles: OFFICE_STAFF }));
 apiRouter.use("/hearings", createResourceRouter("Hearing", { readRoles: OFFICE_STAFF, writeRoles: OFFICE_STAFF }));
 apiRouter.use("/deeds", createResourceRouter("Deed", { readRoles: OFFICE_STAFF, writeRoles: OFFICE_STAFF }));
-apiRouter.use("/disputes", createResourceRouter("Dispute", { readRoles: OFFICE_STAFF, writeRoles: OFFICE_STAFF }));
+// Retired (Phase 1.5, schema-patch spec): read/update/archive stay open
+// for existing records, but no new Dispute can be created — file a
+// Case{type:'land'} instead. See m4RetireDisputes.ts.
+apiRouter.use(
+  "/disputes",
+  createResourceRouter("Dispute", {
+    readRoles: OFFICE_STAFF,
+    writeRoles: OFFICE_STAFF,
+    createDisabledMessage: "Dispute is retired — record a land dispute as a Case with type 'land' instead.",
+  }),
+);
 apiRouter.use("/parcels", landRecordsRouter);
 
 // Fire Incident Reporting (build prompt module 8).

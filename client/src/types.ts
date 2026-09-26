@@ -37,6 +37,13 @@ export interface ResourceModule {
   fields: FieldConfig[];
   titleField: string; // which field to show as the row title
   group: string; // sidebar section heading, e.g. "Case & Land"
+  /**
+   * Retired resource (Dispute, Phase 1.5): existing records stay
+   * viewable/editable, but the "+ New" action is hidden and this message
+   * is shown instead of the create form. The server enforces the same
+   * thing (410 on POST) — this is just so the UI doesn't offer it.
+   */
+  createDisabled?: string;
 }
 
 export interface FieldConfig {

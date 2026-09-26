@@ -142,6 +142,9 @@ export const RESOURCES: Record<string, ResourceDef> = {
     { key: "reporter_name", type: "string" },
     { key: "reporter_phone", type: "string" },
     { key: "respondent_name", type: "string" },
+    // Set by migration M4 (Phase 1.5, schema-patch spec, 2026-09-25) on a
+    // Case created to replace a retired Dispute — see m4RetireDisputes.ts.
+    { key: "legacy_dispute_id", type: "string" },
   ]),
   Parcel: resource("Parcel", true, [
     { key: "parcel_ref", type: "string" },
@@ -203,6 +206,14 @@ export const RESOURCES: Record<string, ResourceDef> = {
     { key: "issue_date", type: "date" },
     { key: "type", type: "string" }, // tribal_certificate | deed_of_gift | lease
   ]),
+  // Retired (Phase 1.5, schema-patch spec, 2026-09-25 — office decision:
+  // retire Dispute). Migration M4 (m4RetireDisputes.ts) replaces each with
+  // a Case{type:'land'} and archives it; the resource stays defined, and
+  // SUBJECT_OF stays in the allowlist below, so existing/legacy Disputes
+  // remain readable until a real-database check confirms none are left
+  // unarchived — see the migration's `remainingUnarchivedDisputes` count.
+  // Creating a new one is disabled in the API (routes/index.ts) and the
+  // client (modules.ts) — this resource takes no new data going forward.
   Dispute: resource("Dispute", true, [
     { key: "status", type: "string", required: true }, // open | resolved
     { key: "notes", type: "string" },
@@ -340,6 +351,9 @@ export const RELATIONSHIPS: RelationshipDef[] = [
   { type: "HOLDS", from: "Person", to: "Deed" },
   { type: "COVERS", from: "Deed", to: "Parcel" },
   { type: "ADJACENT_TO", from: "Parcel", to: "Parcel" },
+  // Retired (Phase 1.5): stays allowlisted only so existing Dispute data
+  // remains readable — remove once no unarchived Disputes remain (see the
+  // Dispute resource def above and m4RetireDisputes.ts).
   { type: "SUBJECT_OF", from: "Parcel", to: "Dispute" },
   { type: "PAID_BY", from: "RevenueRecord", to: "Person" },
   { type: "CONCERNS", from: "Meeting", to: "Case" },

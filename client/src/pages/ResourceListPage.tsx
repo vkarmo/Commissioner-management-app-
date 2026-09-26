@@ -23,10 +23,13 @@ export function ResourceListPage() {
     <div>
       <div className="page-header">
         <h1>{module.label}</h1>
-        <Link to={`/${module.key}/new`} className="button-primary">
-          + New {module.label.replace(/s$/, "")}
-        </Link>
+        {!module.createDisabled && (
+          <Link to={`/${module.key}/new`} className="button-primary">
+            + New {module.label.replace(/s$/, "")}
+          </Link>
+        )}
       </div>
+      {module.createDisabled && <p className="muted">{module.createDisabled}</p>}
 
       {loading ? (
         <p className="muted">Loading…</p>

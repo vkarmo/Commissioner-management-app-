@@ -103,9 +103,14 @@ tools:
   real Person links — a clerk always confirms a suggested match or adds a
   new person; nothing auto-links on name alone.
 
-1.5 (retiring the `Dispute` node in favor of `Case{type: 'land'}`) is
-**not** implemented — the spec itself flags that as needing a decision
-from the office first.
+**Phase 1.5**: the office decided to retire `Dispute` in favor of
+`Case{type: 'land'}`. Migration M4 (`npm run migrate:m4`) replaces each
+Dispute with a Case and archives it — flagging, rather than guessing at,
+a Dispute whose parcel already has an open land Case (likely a duplicate)
+or whose status isn't `open`/`resolved`. Creating a *new* Dispute is now
+disabled in both the UI and the API (existing ones stay viewable/
+archivable); `Dispute` and `SUBJECT_OF` stay in the schema until a real
+run of M4 confirms none are left unarchived.
 
 See [`docs/graph-schema.md`](docs/graph-schema.md) for the full generated
 schema reference (regenerated at the end of every phase).

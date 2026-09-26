@@ -15,6 +15,12 @@ import type { ResourceName, Role } from "../schema/resources.js";
 export interface ResourceRouterOptions {
   readRoles: Role[];
   writeRoles: Role[];
+  /**
+   * When set, POST / responds 410 Gone with this message instead of
+   * creating a node — for a retired resource (Dispute, Phase 1.5) that
+   * still needs read/update/archive access for existing records.
+   */
+  createDisabledMessage?: string;
 }
 
 function handleError(err: unknown, res: import("express").Response) {
@@ -36,10 +42,19 @@ function handleError(err: unknown, res: import("express").Response) {
  * All scope filtering happens in graphService — this layer only checks
  * role membership and wires HTTP <-> service calls.
  */
-export function createResourceRouter(resource: ResourceName, { readRoles, writeRoles }: ResourceRouterOptions) {
+export function createResourceRouter(
+  resource: ResourceName,
+  { readRoles, writeRoles, createDisabledMessage }: ResourceRouterOptions,
+) {
   const router = Router();
 
   router.use(requireAuth);
+
+  if (createDisabledMessage) {
+    router.post("/", requireRole(...writeRoles), (_req, res) => {
+      res.status(410).json({ error: createDisabledMessage });
+    });
+  }
 
   router.get("/", requireRole(...readRoles), async (req, res) => {
     try {

@@ -12,9 +12,12 @@ schema changes.
 **Phase 1** (2026-09-25) added the `LIVES_IN` and `CHIEF_OF` relationships,
 deprecated three now-derived properties, and added a same-scope guard plus
 two derived-field syncs to `graphService.relate()` — see "Migrations
-(Phase 1)" and "Case Party Review (Phase 1.4)" below. 1.5 (retiring
-`Dispute`) is **not** implemented — the spec itself flags it as needing an
-office decision first.
+(Phase 1)" and "Case Party Review (Phase 1.4)" below.
+
+**Phase 1.5** (2026-09-26) — the office decided to retire `Dispute` in
+favor of `Case{type:'land'}`. `Dispute` and `SUBJECT_OF` stay in the
+schema/allowlist (existing data stays readable) but creating a new
+Dispute is disabled; see "Migrations (Phase 1)" below for M4.
 
 This is a **property graph** (Neo4j), not a relational schema — nodes
 carry properties directly (no separate columns/tables), and relationships
@@ -124,6 +127,7 @@ keys, only graph relationships.
 | `reporter_name` | string | no | populated by SMS/WhatsApp intake stub |
 | `reporter_phone` | string | no | |
 | `respondent_name` | string | no | |
+| `legacy_dispute_id` | string | no | set by migration M4 on a Case created to replace a retired Dispute (Phase 1.5) |
 
 **Parcel**
 | Property | Type | Required | Notes |
@@ -198,7 +202,12 @@ keys, only graph relationships.
 | `issue_date` | date | no | |
 | `type` | string | no | tribal_certificate \| deed_of_gift \| lease |
 
-**Dispute**
+**Dispute** — **retired** (Phase 1.5): migration M4 replaces each with a
+`Case{type:'land'}` and archives it; creating a new one is disabled
+(`server/src/routes/index.ts`, `client/src/modules.ts`). Stays defined,
+and `SUBJECT_OF` stays in the allowlist, so existing/legacy Disputes
+remain readable until a real-database check confirms none are left
+unarchived — see M4's `remainingUnarchivedDisputes` count below.
 | Property | Type | Required | Notes |
 |---|---|---|---|
 | `status` | string | yes | open \| resolved |
@@ -388,10 +397,11 @@ Clerk is excluded). Each check returns `{ check, generated_at, findings }`.
 | `repeat-land-cases` | Parcels with more than one `Case{type:'land'}` against them (basic version — Phase 3 adds families/witnesses) |
 | `location-mismatches` | Case/Parcel/PublicWorksItem/FireIncident whose `quarter` string and `LOCATED_IN` Quarter disagree, or where only one of the two is set (Phase 1.3) |
 
-Tests: `server/test/analysis.phase0.test.ts` and
-`server/test/analysis.phase1.test.ts` (`npm test` in `server/`) — require
-`server/.env.test` pointed at a disposable Neo4j instance (see
-`server/.env.test.example`); skip cleanly if not configured.
+Tests: `server/test/analysis.phase0.test.ts`,
+`server/test/analysis.phase1.test.ts`, and `analysis.phase1-5.test.ts`
+(`npm test` in `server/`) — require `server/.env.test` pointed at a
+disposable Neo4j instance (see `server/.env.test.example`); skip cleanly
+if not configured.
 
 ---
 
@@ -406,14 +416,20 @@ database first — ask before running against a real one.
 |---|---|---|
 | `m1PersonLivesInQuarter.ts` | `npm run migrate:m1` | Links each `Person.quarter` string to a same-name Quarter (same county/district) via `LIVES_IN`. Unmatched/ambiguous names are reported, never guessed; Quarters are never auto-created. |
 | `m2QuarterChiefs.ts` | `npm run migrate:m2` | Links each `Person.is_quarter_chief = true` to their Quarter (via an existing `LIVES_IN` edge, or M1's name-match) via `CHIEF_OF` — run M1 first. Reports a Quarter whose `chief_name` has no matching `CHIEF_OF` Person, without auto-creating one. |
+| `m4RetireDisputes.ts` | `npm run migrate:m4` | Office decision (Phase 1.5): replaces each non-archived Dispute with a `Case{type:'land'}` (status mapped, summary from `notes`, `quarter`/`LOCATED_IN` copied from the Parcel if set, `legacy_dispute_id` recorded, `CONCERNS` the Parcel), then archives the Dispute. Reports — without touching either node — a Dispute whose Parcel already has an open, unlinked land Case (likely a duplicate someone already filed), and a Dispute whose `status` isn't `open`/`resolved`. |
 
-Both scripts return a structured report (`{ scanned/linked, unmatched,
-ambiguous }` for M1; `{ personsScanned/linked, personReview,
-quarterMismatches }` for M2) in addition to printing it, and are covered
-by `server/test/analysis.phase1.test.ts`.
+All three scripts return a structured report in addition to printing it
+(`{ scanned/linked, unmatched, ambiguous }` for M1; `{
+personsScanned/linked, personReview, quarterMismatches }` for M2; `{
+scanned, migrated, duplicateCandidates, statusReview,
+remainingUnarchivedDisputes }` for M4), and are covered by
+`server/test/analysis.phase1.test.ts` and `analysis.phase1-5.test.ts`.
 
-**Not implemented (1.5):** retiring `Dispute` in favor of `Case{type:
-'land'}` — the spec flags this as needing an office decision first.
+Once a real run of M4 reports `remainingUnarchivedDisputes: 0`,
+`SUBJECT_OF` can be removed from the allowlist in `resources.ts` and the
+`Dispute` resource definition can be deleted — not done yet, since that
+requires actually running M4 against production data, which this session
+has no network path to do.
 
 ## Case Party Review (Phase 1.4)
 
