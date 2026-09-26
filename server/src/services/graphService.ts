@@ -282,6 +282,16 @@ function relationshipSideEffects(type: string, fromResource: ResourceName, toRes
       setClause: "",
     };
   }
+  // Phase 3: Family.quarter follows the same rule as 1.3, via LIVES_IN
+  // (not LOCATED_IN, to match Family's own semantics) rather than
+  // LOCATED_IN — gated to Family specifically so Person's existing
+  // LIVES_IN (Phase 1, migration M1) is unaffected.
+  if (type === "LIVES_IN" && fromResource === "Family" && toResource === "Quarter") {
+    return {
+      dropStaleEdge: `MATCH (a)-[old:LIVES_IN]->(oldQ:Quarter) WHERE oldQ.id <> $toId DELETE old`,
+      setClause: `SET a.quarter = b.name, a.updated_at = $now`,
+    };
+  }
   return { dropStaleEdge: "", setClause: "" };
 }
 

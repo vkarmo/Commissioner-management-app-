@@ -210,6 +210,14 @@ export const RESOURCES: Record<string, ResourceDef> = {
     { key: "issue_date", type: "date" },
     { key: "type", type: "string" }, // tribal_certificate | deed_of_gift | lease
   ]),
+  // Phase 3 (schema-patch spec, 2026-09-26): families and witnesses.
+  Family: resource("Family", true, [
+    { key: "name", type: "string", required: true }, // e.g. "Zinnah family"
+    // Cache of the LIVES_IN Quarter's name, same rule as 1.3: the edge is
+    // authoritative once set (see graphService.relate()).
+    { key: "quarter", type: "string" },
+    { key: "notes", type: "string" },
+  ]),
   // Retired (Phase 1.5, schema-patch spec, 2026-09-25 — office decision:
   // retire Dispute). Migration M4 (m4RetireDisputes.ts) replaces each with
   // a Case{type:'land'} and archives it; the resource stays defined, and
@@ -370,6 +378,13 @@ export const RELATIONSHIPS: RelationshipDef[] = [
   { type: "HOLDS", from: "Person", to: "Deed" },
   { type: "COVERS", from: "Deed", to: "Parcel" },
   { type: "ADJACENT_TO", from: "Parcel", to: "Parcel" },
+
+  // Phase 3 (schema-patch spec, 2026-09-26): families and witnesses.
+  { type: "MEMBER_OF", from: "Person", to: "Family" },
+  { type: "PARTY_TO", from: "Family", to: "Case" },
+  { type: "LIVES_IN", from: "Family", to: "Quarter" },
+  { type: "WITNESS_IN", from: "Person", to: "Hearing" },
+
   // Retired (Phase 1.5): stays allowlisted only so existing Dispute data
   // remains readable — remove once no unarchived Disputes remain (see the
   // Dispute resource def above and m4RetireDisputes.ts).

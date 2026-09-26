@@ -119,7 +119,7 @@ const CHECKS: CheckDef[] = [
   {
     key: "repeat-land-cases",
     title: "Repeat land cases",
-    description: "Parcels with more than one land case filed against them.",
+    description: "Parcels with more than one land case filed against them, the families and parties involved, and any repeat witness.",
     run: runRepeatLandCases,
     render: (findings) => (
       <table className="record-table">
@@ -127,7 +127,9 @@ const CHECKS: CheckDef[] = [
           <tr>
             <th>Parcel</th>
             <th>Cases</th>
+            <th>Families</th>
             <th>Parties</th>
+            <th>Repeat witnesses</th>
             <th></th>
           </tr>
         </thead>
@@ -140,7 +142,9 @@ const CHECKS: CheckDef[] = [
                   .map((c) => c.number)
                   .join(", ")}
               </td>
-              <td>{(f.parties as string[]).join(", ")}</td>
+              <td>{(f.families as string[]).join(", ") || "—"}</td>
+              <td>{(f.parties as string[]).join(", ") || "—"}</td>
+              <td>{(f.repeat_witnesses as string[]).join(", ") || "—"}</td>
               <td>
                 <Link to={`/parcels/${f.parcel_id}`}>View</Link>
               </td>
