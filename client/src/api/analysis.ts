@@ -29,3 +29,7 @@ export function runLocationMismatches() {
 export function runStalledContractors() {
   return api.get<CheckResult>("/analysis/stalled-contractors");
 }
+
+export function runUnmetCommitments() {
+  return api.get<CheckResult>("/analysis/unmet-commitments");
+}

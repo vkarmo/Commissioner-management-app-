@@ -14,6 +14,7 @@ import { casePartyReviewRouter } from "./casePartyReview.routes.js";
 import { contractorReviewRouter } from "./contractorReview.routes.js";
 import { contractorLinksRouter } from "./contractorLinks.routes.js";
 import { familyLinksRouter } from "./familyLinks.routes.js";
+import { concessionLinksRouter } from "./concessionLinks.routes.js";
 import { OFFICE_STAFF, COUNTY_AGGREGATE_READERS, COUNTY_FINANCE } from "../schema/roleGroups.js";
 
 export const apiRouter = Router();
@@ -116,3 +117,14 @@ apiRouter.use(
 );
 apiRouter.use("/contractor-review", contractorReviewRouter);
 apiRouter.use(contractorLinksRouter);
+
+// Phase 4 (schema-patch spec): concessions and commitments.
+apiRouter.use(
+  "/concessions",
+  createResourceRouter("Concession", { readRoles: budgetReadRoles, writeRoles: budgetWriteRoles }),
+);
+apiRouter.use(
+  "/commitments",
+  createResourceRouter("Commitment", { readRoles: budgetReadRoles, writeRoles: budgetWriteRoles }),
+);
+apiRouter.use(concessionLinksRouter);

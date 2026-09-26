@@ -292,6 +292,22 @@ function relationshipSideEffects(type: string, fromResource: ResourceName, toRes
       setClause: `SET a.quarter = b.name, a.updated_at = $now`,
     };
   }
+  // Phase 4: a CommunicationLog is one complaint, so it has at most one
+  // ABOUT Commitment and, separately, at most one ABOUT PublicWorksItem
+  // (it can still have both — a complaint can be about a project that's
+  // also tied to a specific commitment — just not two of either).
+  if (type === "ABOUT" && fromResource === "CommunicationLog" && toResource === "Commitment") {
+    return {
+      dropStaleEdge: `MATCH (a)-[old:ABOUT]->(oldM:Commitment) WHERE oldM.id <> $toId DELETE old`,
+      setClause: "",
+    };
+  }
+  if (type === "ABOUT" && fromResource === "CommunicationLog" && toResource === "PublicWorksItem") {
+    return {
+      dropStaleEdge: `MATCH (a)-[old:ABOUT]->(oldW:PublicWorksItem) WHERE oldW.id <> $toId DELETE old`,
+      setClause: "",
+    };
+  }
   return { dropStaleEdge: "", setClause: "" };
 }
 

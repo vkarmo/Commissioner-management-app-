@@ -48,9 +48,11 @@ async function runCheck(checkName: string, cypher: string, params: Record<string
   }
 }
 
-// --- 0.1 quarters-left-out ---------------------------------------------
+// --- quarters-left-out ---------------------------------------------------
 // Quarters with no public works item (in the last 3 years) and no budget
-// line targeting them.
+// line targeting them. Extended in Phase 4 with concession context: which
+// concession(s) affect the quarter, and any of that concession's
+// commitments benefiting the quarter that aren't yet delivered.
 analysisRouter.get("/quarters-left-out", async (req, res) => {
   const scope = scopeFromRequest(req);
   const result = await runCheck(
@@ -65,7 +67,13 @@ analysisRouter.get("/quarters-left-out", async (req, res) => {
          MATCH (q)<-[:TARGETS]-(li:BudgetLineItem)
          WHERE li.archived = false
        }
-     RETURN q.id AS quarter_id, q.name AS quarter, q.population AS population
+     OPTIONAL MATCH (q)<-[:AFFECTS]-(cn:Concession)
+     WHERE cn.archived = false
+     OPTIONAL MATCH (cn)-[:COMMITTED]->(m:Commitment)-[:BENEFITS]->(q)
+     WHERE m.archived = false AND m.status <> 'delivered'
+     RETURN q.id AS quarter_id, q.name AS quarter, q.population AS population,
+            collect(DISTINCT cn.name) AS concessions,
+            collect(DISTINCT m.title) AS unmet_commitments
      ORDER BY population DESC`,
     { county: scope.county, district: scope.district, since: yearsAgoISODate(3) },
   );
@@ -202,6 +210,31 @@ analysisRouter.get("/stalled-contractors", async (req, res) => {
             [i IN items | {id: i.id, title: i.title, status: i.status, target_date: i.target_date}] AS overdue_items,
             coalesce(sum(e.amount), 0) AS paid_on_overdue_items
      ORDER BY paid_on_overdue_items DESC`,
+    { county: scope.county, district: scope.district, today: todayISODate() },
+  );
+  res.json(result);
+});
+
+// --- unmet-commitments -----------------------------------------------------
+// Phase 4 (schema-patch spec, 2026-09-26): a concession's commitments
+// that aren't delivered and are overdue (or have no due date at all),
+// plus how many citizen complaints (via ABOUT) have piled up against each.
+analysisRouter.get("/unmet-commitments", async (req, res) => {
+  const scope = scopeFromRequest(req);
+  const result = await runCheck(
+    "unmet-commitments",
+    `MATCH (cn:Concession {county: $county, district: $district})-[:COMMITTED]->(m:Commitment)
+     WHERE cn.archived = false AND m.archived = false
+       AND m.status <> 'delivered'
+       AND (m.due_date IS NULL OR m.due_date < $today)
+     OPTIONAL MATCH (m)-[:BENEFITS]->(q:Quarter)
+     WITH cn, m, collect(DISTINCT q.name) AS quarters
+     OPTIONAL MATCH (l:CommunicationLog)-[:ABOUT]->(m)
+     WHERE l.archived = false
+     RETURN cn.name AS concession, m.id AS commitment_id, m.title AS title, m.status AS status, m.due_date AS due_date,
+            quarters, count(l) AS complaints,
+            collect(l.summary)[0..3] AS recent_complaints
+     ORDER BY complaints DESC`,
     { county: scope.county, district: scope.district, today: todayISODate() },
   );
   res.json(result);

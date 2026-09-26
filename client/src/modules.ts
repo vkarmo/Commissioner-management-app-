@@ -392,9 +392,52 @@ export const MODULES: ResourceModule[] = [
       { key: "notes", label: "Notes", type: "textarea" },
     ],
   },
+  {
+    key: "concessions",
+    resource: "Concession",
+    label: "Concessions",
+    group: "Concessions",
+    titleField: "name",
+    fields: [
+      { key: "name", label: "Name", type: "text", required: true },
+      { key: "holder_company", label: "Holder company", type: "text" },
+      { key: "type", label: "Type", type: "select", options: ["agriculture", "mining", "forestry", "other"] },
+      { key: "agreement_reference", label: "Social agreement / MOU reference", type: "text" },
+      { key: "agreement_date", label: "Agreement date", type: "date" },
+    ],
+  },
+  {
+    key: "commitments",
+    resource: "Commitment",
+    label: "Commitments",
+    group: "Concessions",
+    titleField: "title",
+    fields: [
+      { key: "title", label: "Title", type: "text", required: true },
+      { key: "description", label: "Description", type: "textarea" },
+      { key: "due_date", label: "Due date", type: "date" },
+      {
+        key: "status",
+        label: "Status",
+        type: "select",
+        required: true,
+        options: ["pending", "in_progress", "partial", "delivered", "not_delivered"],
+      },
+      { key: "source_document", label: "Source document (clause/page reference)", type: "text" },
+      { key: "last_verified_date", label: "Last verified on the ground", type: "date" },
+    ],
+  },
 ];
 
-export const MODULE_GROUP_ORDER = ["Community", "Case & Land", "Revenue & Works", "Communications", "Fire", "Finance"];
+export const MODULE_GROUP_ORDER = [
+  "Community",
+  "Case & Land",
+  "Revenue & Works",
+  "Communications",
+  "Fire",
+  "Finance",
+  "Concessions",
+];
 
 export function findModule(key: string): ResourceModule | undefined {
   return MODULES.find((m) => m.key === key);
