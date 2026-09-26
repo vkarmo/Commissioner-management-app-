@@ -25,6 +25,13 @@ five canonical values, and added migration M5 (the contractor-review
 queue for Expenditure payees) — see "Migrations" and "Contractor Review
 (Phase 2, M5)" below.
 
+**Phase 3** (2026-09-26) added `Family` and witnesses (`MEMBER_OF`,
+`PARTY_TO`, `LIVES_IN` from Family, `WITNESS_IN`), and replaced the
+basic `repeat-land-cases` check with the full version (families +
+repeat witnesses) — see "Family & Witness Links (Phase 3)" below. No
+migration: these are new resources/relationships with no legacy data to
+reconcile.
+
 This is a **property graph** (Neo4j), not a relational schema — nodes
 carry properties directly (no separate columns/tables), and relationships
 are typed, directed edges between node labels. Every property is stored
@@ -208,6 +215,13 @@ keys, only graph relationships.
 | `issue_date` | date | no | |
 | `type` | string | no | tribal_certificate \| deed_of_gift \| lease |
 
+**Family** (Phase 3)
+| Property | Type | Required | Notes |
+|---|---|---|---|
+| `name` | string | yes | e.g. "Zinnah family" |
+| `quarter` | string | no | cache of the `LIVES_IN` Quarter's name — same rule as 1.3, edge is authoritative once set |
+| `notes` | string | no | |
+
 **Dispute** — **retired** (Phase 1.5): migration M4 replaces each with a
 `Case{type:'land'}` and archives it; creating a new one is disabled
 (`server/src/routes/index.ts`, `client/src/modules.ts`). Stays defined,
@@ -353,6 +367,10 @@ feature, not attempted here)
 | `HOLDS` | Person | Deed |
 | `COVERS` | Deed | Parcel |
 | `ADJACENT_TO` | Parcel | Parcel |
+| `MEMBER_OF` | Person | Family |
+| `PARTY_TO` | Family | Case |
+| `LIVES_IN` | Family | Quarter |
+| `WITNESS_IN` | Person | Hearing |
 | `SUBJECT_OF` | Parcel | Dispute |
 | `PAID_BY` | RevenueRecord | Person |
 | `CONCERNS` | Meeting | Case |
@@ -408,6 +426,15 @@ than adding a second one. `BUILT_BY` is deliberately **not**
 single-target: a PublicWorksItem can legitimately have more than one
 Contractor over its lifetime.
 
+**Family.quarter** (Phase 3) follows the same rule as `LOCATED_IN` above,
+but via `LIVES_IN` (Family → Quarter) to match Family's own semantics —
+single-target, syncs the string, gated specifically to Family so it
+doesn't change Person's existing `LIVES_IN` behavior from Phase 1 (M1
+links it but doesn't keep it in sync afterward). `MEMBER_OF`,
+`PARTY_TO`, and `WITNESS_IN` are ordinary multi-target relationships — a
+family has several members, a case can have several parties, a hearing
+can have several witnesses.
+
 ---
 
 ## Analysis layer (Phase 0, read-only, no schema changes)
@@ -422,15 +449,16 @@ Clerk is excluded). Each check returns `{ check, generated_at, findings }`.
 | `quarters-left-out` | Quarters with no `PublicWorksItem` in the last 3 years and no `BudgetLineItem` targeting them |
 | `line-item-drift` | Budget lines over-disbursed, over-spent relative to disbursed, or disbursed but never spent |
 | `unapproved-disbursements` | Disbursements from a budget with no approved `ApprovalAction` |
-| `repeat-land-cases` | Parcels with more than one `Case{type:'land'}` against them (basic version — Phase 3 adds families/witnesses) |
+| `repeat-land-cases` | Parcels with more than one `Case{type:'land'}` against them, the families and parties involved, and any witness repeated across more than one of those cases (full version, Phase 3 — replaced the basic version on the same route) |
 | `location-mismatches` | Case/Parcel/PublicWorksItem/FireIncident whose `quarter` string and `LOCATED_IN` Quarter disagree, or where only one of the two is set (Phase 1.3) |
 | `stalled-contractors` | Contractors with 2+ overdue `PublicWorksItem`s (`planned`/`in_progress`/`stalled` past `target_date`), and how much has already been paid on those items (Phase 2) |
 
 Tests: `server/test/analysis.phase0.test.ts`,
-`analysis.phase1.test.ts`, `analysis.phase1-5.test.ts`, and
-`analysis.phase2.test.ts` (`npm test` in `server/`) — require
-`server/.env.test` pointed at a disposable Neo4j instance (see
-`server/.env.test.example`); skip cleanly if not configured.
+`analysis.phase1.test.ts`, `analysis.phase1-5.test.ts`,
+`analysis.phase2.test.ts`, and `analysis.phase3.test.ts` (`npm test` in
+`server/`) — require `server/.env.test` pointed at a disposable Neo4j
+instance (see `server/.env.test.example`); skip cleanly if not
+configured.
 
 ---
 
@@ -498,6 +526,22 @@ PublicWorksItem) outside this flow goes through the existing generic
 convenience endpoints (`GET /api/public-works/:id/contractor`,
 `GET /api/expenditures/:id/links`) let the client show what's currently
 linked before offering a picker.
+
+## Family & Witness Links (Phase 3)
+
+Read-only convenience endpoints (`server/src/routes/familyLinks.routes.ts`,
+office roles) so the client can show who/what is currently linked before
+offering a picker — same pattern as the Phase 2 contractor links:
+
+- `GET /api/families/:id/members` — Persons `MEMBER_OF` this Family.
+- `GET /api/cases/:id/families` — Families `PARTY_TO` this Case.
+- `GET /api/hearings/:id/witnesses` — Persons `WITNESS_IN` this Hearing.
+
+Adding a link goes through the existing generic `POST /api/relate`
+(`MEMBER_OF`/`PARTY_TO`/`WITNESS_IN` are already allowlisted) — there's
+no dedicated write endpoint for any of these, unlike the Phase 1/1.4/2
+review queues, since none of them need a suggestion/confirm workflow: a
+clerk just picks a Person/Family directly.
 
 ---
 

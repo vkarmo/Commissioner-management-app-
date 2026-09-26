@@ -13,6 +13,7 @@ import { analysisRouter } from "./analysis.routes.js";
 import { casePartyReviewRouter } from "./casePartyReview.routes.js";
 import { contractorReviewRouter } from "./contractorReview.routes.js";
 import { contractorLinksRouter } from "./contractorLinks.routes.js";
+import { familyLinksRouter } from "./familyLinks.routes.js";
 import { OFFICE_STAFF, COUNTY_AGGREGATE_READERS, COUNTY_FINANCE } from "../schema/roleGroups.js";
 
 export const apiRouter = Router();
@@ -50,6 +51,9 @@ apiRouter.use(
 apiRouter.use("/officials", createResourceRouter("Official", { readRoles: OFFICE_STAFF, writeRoles: OFFICE_STAFF }));
 apiRouter.use("/hearings", createResourceRouter("Hearing", { readRoles: OFFICE_STAFF, writeRoles: OFFICE_STAFF }));
 apiRouter.use("/deeds", createResourceRouter("Deed", { readRoles: OFFICE_STAFF, writeRoles: OFFICE_STAFF }));
+// Phase 3 (schema-patch spec): families and witnesses.
+apiRouter.use("/families", createResourceRouter("Family", { readRoles: OFFICE_STAFF, writeRoles: OFFICE_STAFF }));
+apiRouter.use(familyLinksRouter);
 // Retired (Phase 1.5, schema-patch spec): read/update/archive stay open
 // for existing records, but no new Dispute can be created — file a
 // Case{type:'land'} instead. See m4RetireDisputes.ts.

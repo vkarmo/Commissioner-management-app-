@@ -4,11 +4,11 @@ import { getSession } from "../db/neo4j.js";
 import type { Role } from "../schema/resources.js";
 
 /**
- * Phase 0 of the analysis layer (schema-patch spec, 2026-09-25): read-only
- * checks over the existing graph, no schema changes. Every query takes
- * $county/$district from the caller's session scope — never from the
- * request — and filters archived = false on every matched node, per the
- * spec's conventions.
+ * The analysis layer (schema-patch spec, 2026-09-25 onward): read-only
+ * checks over the graph, added phase by phase (0, then 1.3, 2, 3 below).
+ * Every query takes $county/$district from the caller's session scope —
+ * never from the request — and filters archived = false on every matched
+ * node, per the spec's conventions.
  *
  * Not exposed to Clerk: findings can name specific people (parties,
  * witnesses, contractors), so this is Commissioner/Official/SuperAdmin only.
@@ -122,9 +122,11 @@ analysisRouter.get("/unapproved-disbursements", async (req, res) => {
   res.json(result);
 });
 
-// --- 0.4 repeat-land-cases (basic) --------------------------------------
-// Parcels with more than one land case. Phase 3 replaces this with the
-// full version (families + witnesses).
+// --- repeat-land-cases (full version, Phase 3) ---------------------------
+// Parcels with more than one land case, now with families party to those
+// cases and any witness who's repeated across more than one of them.
+// Replaces 0.4's basic version (same core matching — size(cases) > 1 —
+// just with families/repeat_witnesses added) on the same route.
 analysisRouter.get("/repeat-land-cases", async (req, res) => {
   const scope = scopeFromRequest(req);
   const result = await runCheck(
@@ -133,11 +135,17 @@ analysisRouter.get("/repeat-land-cases", async (req, res) => {
      WHERE p.archived = false AND c.archived = false
      WITH p, collect(c) AS cases
      WHERE size(cases) > 1
-     OPTIONAL MATCH (c2:Case)-[:INVOLVES]->(x:Person)
-     WHERE c2 IN cases
+     OPTIONAL MATCH (f:Family)-[:PARTY_TO]->(cf:Case) WHERE cf IN cases
+     WITH p, cases, collect(DISTINCT f.name) AS families
+     OPTIONAL MATCH (x:Person)<-[:INVOLVES]-(cp:Case) WHERE cp IN cases
+     WITH p, cases, families, collect(DISTINCT x.full_name) AS parties
+     OPTIONAL MATCH (w:Person)-[:WITNESS_IN]->(h:Hearing)<-[:HEARD_AT]-(cw:Case)
+     WHERE cw IN cases
+     WITH p, cases, families, parties, w, count(DISTINCT cw) AS cases_witnessed
      RETURN p.id AS parcel_id, p.parcel_ref AS parcel_ref, size(cases) AS case_count,
             [c IN cases | {id: c.id, number: c.case_number, status: c.status, filed: c.filed_date}] AS cases,
-            collect(DISTINCT x.full_name) AS parties`,
+            families, parties,
+            [n IN collect(CASE WHEN cases_witnessed > 1 THEN w.full_name END) WHERE n IS NOT NULL] AS repeat_witnesses`,
     { county: scope.county, district: scope.district },
   );
   res.json(result);

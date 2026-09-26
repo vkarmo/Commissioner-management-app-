@@ -6,6 +6,15 @@ import { RecordForm } from "../components/RecordForm";
 import { FireIncidentActions } from "../components/FireIncidentActions";
 import { ParcelDetailPanel } from "../components/ParcelDetailPanel";
 import { ContractorLinkPanel } from "../components/ContractorLinkPanel";
+import { RelatedListPanel } from "../components/RelatedListPanel";
+import {
+  addRelationship,
+  listCaseFamilies,
+  listFamiliesForPicker,
+  listFamilyMembers,
+  listHearingWitnesses,
+  listPeopleForPicker,
+} from "../api/familyLinks";
 
 export function ResourceFormPage() {
   const { moduleKey = "", id } = useParams();
@@ -60,6 +69,39 @@ export function ResourceFormPage() {
       {!isNew && id && module.key === "parcels" && <ParcelDetailPanel parcelId={id} />}
       {!isNew && id && module.key === "public-works" && <ContractorLinkPanel mode="public-works" recordId={id} />}
       {!isNew && id && module.key === "expenditures" && <ContractorLinkPanel mode="expenditure" recordId={id} />}
+      {!isNew && id && module.key === "families" && (
+        <RelatedListPanel
+          title="Members"
+          emptyMessage="No family members yet."
+          pickerLabel="Add a family member…"
+          labelField="full_name"
+          listCurrent={() => listFamilyMembers(id)}
+          listCandidates={listPeopleForPicker}
+          onAdd={(personId) => addRelationship("MEMBER_OF", "Person", personId, "Family", id)}
+        />
+      )}
+      {!isNew && id && module.key === "cases" && (
+        <RelatedListPanel
+          title="Families party to this case"
+          emptyMessage="No families linked yet."
+          pickerLabel="Add a family…"
+          labelField="name"
+          listCurrent={() => listCaseFamilies(id)}
+          listCandidates={listFamiliesForPicker}
+          onAdd={(familyId) => addRelationship("PARTY_TO", "Family", familyId, "Case", id)}
+        />
+      )}
+      {!isNew && id && module.key === "hearings" && (
+        <RelatedListPanel
+          title="Witnesses"
+          emptyMessage="No witnesses recorded yet."
+          pickerLabel="Add a witness…"
+          labelField="full_name"
+          listCurrent={() => listHearingWitnesses(id)}
+          listCandidates={listPeopleForPicker}
+          onAdd={(personId) => addRelationship("WITNESS_IN", "Person", personId, "Hearing", id)}
+        />
+      )}
     </div>
   );
 }

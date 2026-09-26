@@ -85,6 +85,18 @@ export const MODULES: ResourceModule[] = [
     ],
   },
   {
+    key: "families",
+    resource: "Family",
+    label: "Families",
+    group: "Case & Land",
+    titleField: "name",
+    fields: [
+      { key: "name", label: "Family name", type: "text", required: true },
+      { key: "quarter", label: "Quarter/Town", type: "text" },
+      { key: "notes", label: "Notes", type: "textarea" },
+    ],
+  },
+  {
     key: "parcels",
     resource: "Parcel",
     label: "Land Parcels",

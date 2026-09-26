@@ -133,6 +133,21 @@ trail:
   confirm a group as a Contractor (existing or new) or mark it not a
   contractor — never auto-merged.
 
+**Phase 3** added families and witnesses — no migration, since these are
+new resources/relationships with no legacy data to reconcile:
+
+- **Families** (`/families`): a new module. A family can be a member of
+  several `Person`s (`MEMBER_OF`), party to several land `Case`s
+  (`PARTY_TO`), and lives in a Quarter the same way `Person`/`Case`/etc.
+  do (`LIVES_IN`, edge authoritative over the `quarter` string cache).
+  Pickers for "families party to this case" and "witnesses" live on the
+  Case and Hearing edit pages; a "members" picker lives on the Family
+  edit page.
+- **`repeat-land-cases`** (Analysis) is now the full version: alongside
+  the repeat parcel's cases and parties, it lists the families party to
+  those cases and any witness who's testified across more than one of
+  them.
+
 See [`docs/graph-schema.md`](docs/graph-schema.md) for the full generated
 schema reference (regenerated at the end of every phase).
 
