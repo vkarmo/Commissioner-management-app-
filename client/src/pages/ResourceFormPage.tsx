@@ -5,6 +5,7 @@ import { createResource, getResource, updateResource } from "../api/resources";
 import { RecordForm } from "../components/RecordForm";
 import { FireIncidentActions } from "../components/FireIncidentActions";
 import { ParcelDetailPanel } from "../components/ParcelDetailPanel";
+import { ContractorLinkPanel } from "../components/ContractorLinkPanel";
 
 export function ResourceFormPage() {
   const { moduleKey = "", id } = useParams();
@@ -57,6 +58,8 @@ export function ResourceFormPage() {
           base form which always works from the local queue/cache. */}
       {!isNew && id && module.key === "fire-incidents" && <FireIncidentActions incidentId={id} />}
       {!isNew && id && module.key === "parcels" && <ParcelDetailPanel parcelId={id} />}
+      {!isNew && id && module.key === "public-works" && <ContractorLinkPanel mode="public-works" recordId={id} />}
+      {!isNew && id && module.key === "expenditures" && <ContractorLinkPanel mode="expenditure" recordId={id} />}
     </div>
   );
 }

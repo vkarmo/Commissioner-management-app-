@@ -162,6 +162,10 @@ export const RESOURCES: Record<string, ResourceDef> = {
     { key: "title", type: "string", required: true },
     { key: "category", type: "string" }, // road | water_point | school | clinic | other
     { key: "quarter", type: "string" },
+    // planned | in_progress | stalled | completed | cancelled (Phase 2,
+    // schema-patch spec, 2026-09-26 — was a free string; older records may
+    // still carry a pre-Phase-2 value like "funded" until reviewed, see
+    // migrations/normalizePublicWorksStatus.ts).
     { key: "status", type: "string", required: true },
     { key: "target_date", type: "date" },
     { key: "gps_lat", type: "number" },
@@ -283,11 +287,26 @@ export const RESOURCES: Record<string, ResourceDef> = {
     { key: "date", type: "date", required: true },
     { key: "payee", type: "string", required: true },
     { key: "receipt_reference", type: "string" },
+    // Internal bookkeeping for migration M5's payee-grouping review queue
+    // (Phase 2, contractorReview.routes.ts) — not a client form field.
+    // pending (unset) | linked | not_contractor
+    { key: "contractor_review_status", type: "string" },
   ]),
   ApprovalAction: resource("ApprovalAction", true, [
     { key: "date", type: "date", required: true },
     { key: "decision", type: "string", required: true }, // approved | rejected | pending | revised
     { key: "approving_body", type: "string", required: true }, // County Council | Superintendent | Finance Officer
+    { key: "notes", type: "string" },
+  ]),
+  // Phase 2 (schema-patch spec, 2026-09-26): scoped per office for the MVP,
+  // even though a contractor often works across districts — matching the
+  // same company across districts (by registration_number) is a later
+  // county-level feature, not attempted here.
+  Contractor: resource("Contractor", true, [
+    { key: "name", type: "string", required: true },
+    { key: "registration_number", type: "string" }, // Liberia Business Registry number
+    { key: "phone", type: "string" },
+    { key: "owner_name", type: "string" },
     { key: "notes", type: "string" },
   ]),
 
@@ -379,6 +398,13 @@ export const RELATIONSHIPS: RelationshipDef[] = [
   { type: "SPENT_AS", from: "Disbursement", to: "Expenditure" },
   { type: "TARGETS", from: "BudgetLineItem", to: "Quarter" },
   { type: "RECORDED_VIA", from: "ApprovalAction", to: "CommunicationLog" },
+
+  // Phase 2 (schema-patch spec, 2026-09-26): the project money trail.
+  // FOR fixes the gap where one budget line funds several works items and
+  // payments couldn't be attributed to a specific project.
+  { type: "BUILT_BY", from: "PublicWorksItem", to: "Contractor" },
+  { type: "PAID_TO", from: "Expenditure", to: "Contractor" },
+  { type: "FOR", from: "Expenditure", to: "PublicWorksItem" },
 ];
 
 export function isRelationshipAllowed(

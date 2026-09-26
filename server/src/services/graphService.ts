@@ -265,6 +265,23 @@ function relationshipSideEffects(type: string, fromResource: ResourceName, toRes
                        a.is_quarter_chief = true, a.updated_at = $now`,
     };
   }
+  // Phase 2: an Expenditure is one transaction, so PAID_TO and FOR are
+  // single-target like LOCATED_IN/CHIEF_OF above — re-relating to a
+  // different Contractor/PublicWorksItem replaces the previous one.
+  // BUILT_BY is deliberately NOT single-target: a PublicWorksItem can
+  // legitimately have more than one Contractor over its lifetime.
+  if (type === "PAID_TO" && fromResource === "Expenditure" && toResource === "Contractor") {
+    return {
+      dropStaleEdge: `MATCH (a)-[old:PAID_TO]->(oldK:Contractor) WHERE oldK.id <> $toId DELETE old`,
+      setClause: "",
+    };
+  }
+  if (type === "FOR" && fromResource === "Expenditure" && toResource === "PublicWorksItem") {
+    return {
+      dropStaleEdge: `MATCH (a)-[old:FOR]->(oldW:PublicWorksItem) WHERE oldW.id <> $toId DELETE old`,
+      setClause: "",
+    };
+  }
   return { dropStaleEdge: "", setClause: "" };
 }
 

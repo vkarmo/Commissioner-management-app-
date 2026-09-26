@@ -44,6 +44,9 @@ export function Layout() {
             {user && OFFICE_STAFF_ROLES.has(user.role) && (
               <NavLink to="/case-party-review">Case Party Review</NavLink>
             )}
+            {user && OFFICE_STAFF_ROLES.has(user.role) && (
+              <NavLink to="/contractor-review">Contractor Review</NavLink>
+            )}
             <NavLink to="/conflicts">Sync Conflicts</NavLink>
             {user && ADMIN_ROLES.has(user.role) && <NavLink to="/admin/whitelist">Whitelist</NavLink>}
             {user && ADMIN_ROLES.has(user.role) && <NavLink to="/admin/settings">Settings</NavLink>}

@@ -11,13 +11,19 @@ schema changes.
 
 **Phase 1** (2026-09-25) added the `LIVES_IN` and `CHIEF_OF` relationships,
 deprecated three now-derived properties, and added a same-scope guard plus
-two derived-field syncs to `graphService.relate()` — see "Migrations
-(Phase 1)" and "Case Party Review (Phase 1.4)" below.
+two derived-field syncs to `graphService.relate()` — see "Migrations"
+and "Case Party Review (Phase 1.4)" below.
 
 **Phase 1.5** (2026-09-26) — the office decided to retire `Dispute` in
 favor of `Case{type:'land'}`. `Dispute` and `SUBJECT_OF` stay in the
 schema/allowlist (existing data stays readable) but creating a new
-Dispute is disabled; see "Migrations (Phase 1)" below for M4.
+Dispute is disabled; see "Migrations" below for M4.
+
+**Phase 2** (2026-09-26) added `Contractor` and the project money trail
+(`BUILT_BY`/`PAID_TO`/`FOR`), normalized `PublicWorksItem.status` onto
+five canonical values, and added migration M5 (the contractor-review
+queue for Expenditure payees) — see "Migrations" and "Contractor Review
+(Phase 2, M5)" below.
 
 This is a **property graph** (Neo4j), not a relational schema — nodes
 carry properties directly (no separate columns/tables), and relationships
@@ -146,7 +152,7 @@ keys, only graph relationships.
 | `title` | string | yes | |
 | `category` | string | no | road \| water_point \| school \| clinic \| other |
 | `quarter` | string | no | |
-| `status` | string | yes | |
+| `status` | string | yes | planned \| in_progress \| stalled \| completed \| cancelled (Phase 2 — older records may still carry a pre-Phase-2 value like "funded" until reviewed, see `migrations/normalizePublicWorksStatus.ts`) |
 | `target_date` | date | no | |
 | `gps_lat` | number | no | |
 | `gps_lng` | number | no | |
@@ -280,12 +286,13 @@ unarchived — see M4's `remainingUnarchivedDisputes` count below.
 | `reference_number` | string | no |
 
 **Expenditure**
-| Property | Type | Required |
-|---|---|---|
-| `amount` | number | yes |
-| `date` | date | yes |
-| `payee` | string | yes |
-| `receipt_reference` | string | no |
+| Property | Type | Required | Notes |
+|---|---|---|---|
+| `amount` | number | yes | |
+| `date` | date | yes | |
+| `payee` | string | yes | |
+| `receipt_reference` | string | no | |
+| `contractor_review_status` | string | no | pending (unset) \| linked \| not_contractor — internal bookkeeping for migration M5 (Phase 2), not a client form field |
 
 **ApprovalAction**
 | Property | Type | Required | Notes |
@@ -293,6 +300,17 @@ unarchived — see M4's `remainingUnarchivedDisputes` count below.
 | `date` | date | yes | |
 | `decision` | string | yes | approved \| rejected \| pending \| revised |
 | `approving_body` | string | yes | County Council \| Superintendent \| Finance Officer |
+| `notes` | string | no | |
+
+**Contractor** (Phase 2 — scoped per office; matching the same company
+across districts by `registration_number` is a later county-level
+feature, not attempted here)
+| Property | Type | Required | Notes |
+|---|---|---|---|
+| `name` | string | yes | |
+| `registration_number` | string | no | Liberia Business Registry number |
+| `phone` | string | no | |
+| `owner_name` | string | no | |
 | `notes` | string | no | |
 
 ### Offline sync bookkeeping (unscoped, but carries county/district manually)
@@ -358,6 +376,9 @@ unarchived — see M4's `remainingUnarchivedDisputes` count below.
 | `SPENT_AS` | Disbursement | Expenditure |
 | `TARGETS` | BudgetLineItem | Quarter |
 | `RECORDED_VIA` | ApprovalAction | CommunicationLog |
+| `BUILT_BY` | PublicWorksItem | Contractor |
+| `PAID_TO` | Expenditure | Contractor |
+| `FOR` | Expenditure | PublicWorksItem |
 
 This list is an **allowlist** enforced server-side (`isRelationshipAllowed`
 in `resources.ts`) — the API rejects any relationship type/from/to
@@ -380,6 +401,13 @@ sync so they can't drift, no matter which route creates the edge:
   previous chief's flag if there was one — a Quarter has at most one
   current `CHIEF_OF` Person.
 
+**Single-target relationships** (Phase 2): `PAID_TO` and `FOR` are also
+single-target — an Expenditure is one transaction, so relating it to a
+different Contractor/PublicWorksItem replaces the previous edge rather
+than adding a second one. `BUILT_BY` is deliberately **not**
+single-target: a PublicWorksItem can legitimately have more than one
+Contractor over its lifetime.
+
 ---
 
 ## Analysis layer (Phase 0, read-only, no schema changes)
@@ -396,19 +424,21 @@ Clerk is excluded). Each check returns `{ check, generated_at, findings }`.
 | `unapproved-disbursements` | Disbursements from a budget with no approved `ApprovalAction` |
 | `repeat-land-cases` | Parcels with more than one `Case{type:'land'}` against them (basic version — Phase 3 adds families/witnesses) |
 | `location-mismatches` | Case/Parcel/PublicWorksItem/FireIncident whose `quarter` string and `LOCATED_IN` Quarter disagree, or where only one of the two is set (Phase 1.3) |
+| `stalled-contractors` | Contractors with 2+ overdue `PublicWorksItem`s (`planned`/`in_progress`/`stalled` past `target_date`), and how much has already been paid on those items (Phase 2) |
 
 Tests: `server/test/analysis.phase0.test.ts`,
-`server/test/analysis.phase1.test.ts`, and `analysis.phase1-5.test.ts`
-(`npm test` in `server/`) — require `server/.env.test` pointed at a
-disposable Neo4j instance (see `server/.env.test.example`); skip cleanly
-if not configured.
+`analysis.phase1.test.ts`, `analysis.phase1-5.test.ts`, and
+`analysis.phase2.test.ts` (`npm test` in `server/`) — require
+`server/.env.test` pointed at a disposable Neo4j instance (see
+`server/.env.test.example`); skip cleanly if not configured.
 
 ---
 
-## Migrations (Phase 1)
+## Migrations
 
 Non-destructive, idempotent scripts under `server/src/migrations/`. Each
-only adds edges (never deletes or overwrites existing data) and reports
+only adds edges (or, where the spec explicitly calls for it — the status
+normalization below — maps a value onto a canonical one) and reports
 anything ambiguous instead of guessing. Run against a seeded local
 database first — ask before running against a real one.
 
@@ -417,13 +447,12 @@ database first — ask before running against a real one.
 | `m1PersonLivesInQuarter.ts` | `npm run migrate:m1` | Links each `Person.quarter` string to a same-name Quarter (same county/district) via `LIVES_IN`. Unmatched/ambiguous names are reported, never guessed; Quarters are never auto-created. |
 | `m2QuarterChiefs.ts` | `npm run migrate:m2` | Links each `Person.is_quarter_chief = true` to their Quarter (via an existing `LIVES_IN` edge, or M1's name-match) via `CHIEF_OF` — run M1 first. Reports a Quarter whose `chief_name` has no matching `CHIEF_OF` Person, without auto-creating one. |
 | `m4RetireDisputes.ts` | `npm run migrate:m4` | Office decision (Phase 1.5): replaces each non-archived Dispute with a `Case{type:'land'}` (status mapped, summary from `notes`, `quarter`/`LOCATED_IN` copied from the Parcel if set, `legacy_dispute_id` recorded, `CONCERNS` the Parcel), then archives the Dispute. Reports — without touching either node — a Dispute whose Parcel already has an open, unlinked land Case (likely a duplicate someone already filed), and a Dispute whose `status` isn't `open`/`resolved`. |
+| `normalizePublicWorksStatus.ts` | `npm run migrate:normalize-status` | Phase 2: maps an obvious `PublicWorksItem.status` synonym (`"in progress"`, `"complete"`, `"cancelled"`, `"on hold"`, `"new"`, etc.) onto the canonical five values. A value with no obvious mapping — notably `"funded"`, genuinely ambiguous between `planned`/`in_progress` — is reported, never guessed. |
 
-All three scripts return a structured report in addition to printing it
-(`{ scanned/linked, unmatched, ambiguous }` for M1; `{
-personsScanned/linked, personReview, quarterMismatches }` for M2; `{
-scanned, migrated, duplicateCandidates, statusReview,
-remainingUnarchivedDisputes }` for M4), and are covered by
-`server/test/analysis.phase1.test.ts` and `analysis.phase1-5.test.ts`.
+Each script returns a structured report in addition to printing it (see
+each file's own doc comment for its exact shape), and is covered by
+`server/test/analysis.phase1.test.ts`, `analysis.phase1-5.test.ts`, or
+`analysis.phase2.test.ts`.
 
 Once a real run of M4 reports `remainingUnarchivedDisputes: 0`,
 `SUBJECT_OF` can be removed from the allowlist in `resources.ts` and the
@@ -444,6 +473,31 @@ a name match — a clerk always confirms:
   creates `FILED` (reporter) or `INVOLVES` (respondent).
 - `POST /:caseId/new-person` `{ field, full_name, phone? }` — creates a
   new Person in the case's scope, then links it the same way.
+
+## Contractor Review (Phase 2, M5)
+
+`GET /api/contractor-review` (office roles, plus county finance/aggregate
+readers) — groups unreviewed `Expenditure.payee` values by a normalized
+name (lowercase, punctuation stripped, `inc`/`ltd`/`llc`/`co`/`corp`/
+`company` suffixes stripped) so the same vendor spelled differently shows
+up as one group. Already-linked or already-dismissed expenditures
+(`contractor_review_status` set, or an existing `PAID_TO` edge) are
+excluded. Nothing is ever auto-merged — a clerk always confirms:
+
+- `POST /confirm` `{ expenditureIds, contractor: {id} | {name, ...} }` —
+  links every expenditure in the group to that Contractor (creating it
+  first if `contractor` has no `id`) via `PAID_TO`, and sets
+  `contractor_review_status = 'linked'`.
+- `POST /dismiss` `{ expenditureIds }` — sets `contractor_review_status =
+  'not_contractor'` (a refund, fuel, allowances, etc.) so the group stops
+  reappearing.
+
+Setting `BUILT_BY` (PublicWorksItem → Contractor) or `FOR` (Expenditure →
+PublicWorksItem) outside this flow goes through the existing generic
+`POST /api/relate`, same as every other relationship in the app; read-only
+convenience endpoints (`GET /api/public-works/:id/contractor`,
+`GET /api/expenditures/:id/links`) let the client show what's currently
+linked before offering a picker.
 
 ---
 

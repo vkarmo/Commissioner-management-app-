@@ -25,3 +25,7 @@ export function runRepeatLandCases() {
 export function runLocationMismatches() {
   return api.get<CheckResult>("/analysis/location-mismatches");
 }
+
+export function runStalledContractors() {
+  return api.get<CheckResult>("/analysis/stalled-contractors");
+}

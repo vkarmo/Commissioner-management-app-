@@ -112,6 +112,27 @@ disabled in both the UI and the API (existing ones stay viewable/
 archivable); `Dispute` and `SUBJECT_OF` stay in the schema until a real
 run of M4 confirms none are left unarchived.
 
+**Phase 2** added one more check plus contractors and the project money
+trail:
+
+| Check | What it flags |
+|---|---|
+| `stalled-contractors` | Contractors with 2+ overdue public works items, and how much has already been paid on them |
+
+- **Contractors** (`/contractors`): a new module, linked to a
+  `PublicWorksItem` via `BUILT_BY` (a project can have more than one
+  contractor) and to an `Expenditure` via `PAID_TO`/`FOR` (single-target —
+  one expenditure is one transaction) — pickers for both live on the
+  respective edit pages.
+- **PublicWorksItem.status** is now a five-value enum (`planned` /
+  `in_progress` / `stalled` / `completed` / `cancelled`). Migration
+  `npm run migrate:normalize-status` maps obvious old values onto these;
+  anything genuinely ambiguous (e.g. `funded`) is reported, not guessed.
+- **Contractor Review** (`/contractor-review`, migration M5): groups
+  `Expenditure.payee` values by a normalized spelling so a clerk can
+  confirm a group as a Contractor (existing or new) or mark it not a
+  contractor — never auto-merged.
+
 See [`docs/graph-schema.md`](docs/graph-schema.md) for the full generated
 schema reference (regenerated at the end of every phase).
 

@@ -175,6 +175,30 @@ analysisRouter.get("/location-mismatches", async (req, res) => {
   res.json(result);
 });
 
+// --- 2. stalled-contractors -----------------------------------------------
+// Phase 2 (schema-patch spec, 2026-09-26): contractors with 2+ overdue
+// PublicWorksItems, and how much they've already been paid on those items.
+analysisRouter.get("/stalled-contractors", async (req, res) => {
+  const scope = scopeFromRequest(req);
+  const result = await runCheck(
+    "stalled-contractors",
+    `MATCH (k:Contractor {county: $county, district: $district})<-[:BUILT_BY]-(w:PublicWorksItem)
+     WHERE k.archived = false AND w.archived = false
+       AND w.status IN ['planned', 'in_progress', 'stalled']
+       AND w.target_date < $today
+     WITH k, collect(w) AS items
+     WHERE size(items) >= 2
+     OPTIONAL MATCH (e:Expenditure)-[:FOR]->(w2:PublicWorksItem)
+     WHERE w2 IN items AND e.archived = false
+     RETURN k.id AS contractor_id, k.name AS name,
+            [i IN items | {id: i.id, title: i.title, status: i.status, target_date: i.target_date}] AS overdue_items,
+            coalesce(sum(e.amount), 0) AS paid_on_overdue_items
+     ORDER BY paid_on_overdue_items DESC`,
+    { county: scope.county, district: scope.district, today: todayISODate() },
+  );
+  res.json(result);
+});
+
 // Exported for the Phase 0 test suite (avoids re-deriving "today" with a
 // slightly different clock read than the routes above used).
 export const analysisDateHelpers = { todayISODate, yearsAgoISODate };
