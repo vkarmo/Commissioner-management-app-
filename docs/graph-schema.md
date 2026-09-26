@@ -32,6 +32,13 @@ repeat witnesses) — see "Family & Witness Links (Phase 3)" below. No
 migration: these are new resources/relationships with no legacy data to
 reconcile.
 
+**Phase 4** (2026-09-26, final phase in the spec) added `Concession` and
+`Commitment` (`AFFECTS`, `COMMITTED`, `BENEFITS`, and the two `ABOUT`
+edges that let a citizen complaint attach to a specific promise or
+project), the `unmet-commitments` check, and extended `quarters-left-out`
+with concession context — see "Concession & Commitment Links (Phase 4)"
+below. No migration, same reason as Phase 3.
+
 This is a **property graph** (Neo4j), not a relational schema — nodes
 carry properties directly (no separate columns/tables), and relationships
 are typed, directed edges between node labels. Every property is stored
@@ -327,6 +334,27 @@ feature, not attempted here)
 | `owner_name` | string | no | |
 | `notes` | string | no | |
 
+**Concession** (Phase 4 — scoped per office, same MVP tradeoff as
+Contractor: a concession often spans districts, but matching one across
+districts by `agreement_reference` is a later county-level feature)
+| Property | Type | Required | Notes |
+|---|---|---|---|
+| `name` | string | yes | |
+| `holder_company` | string | no | |
+| `type` | string | no | agriculture \| mining \| forestry \| other |
+| `agreement_reference` | string | no | social agreement or MOU reference |
+| `agreement_date` | date | no | |
+
+**Commitment** (Phase 4)
+| Property | Type | Required | Notes |
+|---|---|---|---|
+| `title` | string | yes | e.g. "School for Bondi Village" |
+| `description` | string | no | |
+| `due_date` | date | no | |
+| `status` | string | yes | pending \| in_progress \| partial \| delivered \| not_delivered |
+| `source_document` | string | no | clause or page reference |
+| `last_verified_date` | date | no | when someone last checked on the ground |
+
 ### Offline sync bookkeeping (unscoped, but carries county/district manually)
 
 **SyncConflict**
@@ -397,6 +425,11 @@ feature, not attempted here)
 | `BUILT_BY` | PublicWorksItem | Contractor |
 | `PAID_TO` | Expenditure | Contractor |
 | `FOR` | Expenditure | PublicWorksItem |
+| `AFFECTS` | Concession | Quarter |
+| `COMMITTED` | Concession | Commitment |
+| `BENEFITS` | Commitment | Quarter |
+| `ABOUT` | CommunicationLog | Commitment |
+| `ABOUT` | CommunicationLog | PublicWorksItem |
 
 This list is an **allowlist** enforced server-side (`isRelationshipAllowed`
 in `resources.ts`) — the API rejects any relationship type/from/to
@@ -435,6 +468,14 @@ links it but doesn't keep it in sync afterward). `MEMBER_OF`,
 family has several members, a case can have several parties, a hearing
 can have several witnesses.
 
+**ABOUT** (Phase 4) is single-target on each side independently — a
+CommunicationLog has at most one `ABOUT` Commitment and, separately, at
+most one `ABOUT` PublicWorksItem (it can still have both at once: a
+complaint about a project that's also tied to a specific commitment).
+`AFFECTS`, `COMMITTED`, and `BENEFITS` are ordinary multi-target
+relationships — a concession can affect several quarters and have
+several commitments, and a commitment can benefit several quarters.
+
 ---
 
 ## Analysis layer (Phase 0, read-only, no schema changes)
@@ -446,16 +487,18 @@ Clerk is excluded). Each check returns `{ check, generated_at, findings }`.
 
 | Check | What it flags |
 |---|---|
-| `quarters-left-out` | Quarters with no `PublicWorksItem` in the last 3 years and no `BudgetLineItem` targeting them |
+| `quarters-left-out` | Quarters with no `PublicWorksItem` in the last 3 years and no `BudgetLineItem` targeting them — extended in Phase 4 with any concession affecting the quarter and its undelivered commitments benefiting it |
 | `line-item-drift` | Budget lines over-disbursed, over-spent relative to disbursed, or disbursed but never spent |
 | `unapproved-disbursements` | Disbursements from a budget with no approved `ApprovalAction` |
 | `repeat-land-cases` | Parcels with more than one `Case{type:'land'}` against them, the families and parties involved, and any witness repeated across more than one of those cases (full version, Phase 3 — replaced the basic version on the same route) |
 | `location-mismatches` | Case/Parcel/PublicWorksItem/FireIncident whose `quarter` string and `LOCATED_IN` Quarter disagree, or where only one of the two is set (Phase 1.3) |
 | `stalled-contractors` | Contractors with 2+ overdue `PublicWorksItem`s (`planned`/`in_progress`/`stalled` past `target_date`), and how much has already been paid on those items (Phase 2) |
+| `unmet-commitments` | A concession's commitments that aren't `delivered` and are overdue (or have no due date), with quarters benefiting and citizen complaints (`ABOUT`) logged against each (Phase 4) |
 
 Tests: `server/test/analysis.phase0.test.ts`,
 `analysis.phase1.test.ts`, `analysis.phase1-5.test.ts`,
-`analysis.phase2.test.ts`, and `analysis.phase3.test.ts` (`npm test` in
+`analysis.phase2.test.ts`, `analysis.phase3.test.ts`, and
+`analysis.phase4.test.ts` (`npm test` in
 `server/`) — require `server/.env.test` pointed at a disposable Neo4j
 instance (see `server/.env.test.example`); skip cleanly if not
 configured.
@@ -542,6 +585,31 @@ Adding a link goes through the existing generic `POST /api/relate`
 no dedicated write endpoint for any of these, unlike the Phase 1/1.4/2
 review queues, since none of them need a suggestion/confirm workflow: a
 clerk just picks a Person/Family directly.
+
+## Concession & Commitment Links (Phase 4)
+
+Read-only convenience endpoints (`server/src/routes/concessionLinks.routes.ts`,
+office roles plus county finance/aggregate readers) — same pattern as the
+Phase 2/3 link endpoints:
+
+- `GET /api/concessions/:id/quarters` — Quarters `AFFECTS`ed by this
+  Concession.
+- `GET /api/concessions/:id/commitments` — Commitments `COMMITTED` by
+  this Concession.
+- `GET /api/commitments/:id/quarters` — Quarters `BENEFITS`ing from this
+  Commitment.
+- `GET /api/communications/:id/about` — `{ commitment, publicWorksItem }`,
+  each at most one (see the single-target note above) — the "link to
+  commitment/project" action on a CommunicationLog entry.
+
+Adding a link goes through the existing generic `POST /api/relate`
+(`AFFECTS`/`COMMITTED`/`BENEFITS`/`ABOUT` are already allowlisted).
+
+This is the last phase in the schema-patch spec — every check, migration,
+and resource it defined is now implemented (aside from what a phase's own
+text explicitly held back: 1.5's `SUBJECT_OF` removal pending a real M4
+run, and Phase 4's county-level concession/contractor matching, both
+noted where they come up above).
 
 ---
 

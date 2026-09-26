@@ -15,6 +15,14 @@ import {
   listHearingWitnesses,
   listPeopleForPicker,
 } from "../api/familyLinks";
+import { CommunicationAboutPanel } from "../components/CommunicationAboutPanel";
+import {
+  listCommitmentQuarters,
+  listCommitmentsForPicker,
+  listConcessionCommitments,
+  listConcessionQuarters,
+  listQuartersForPicker,
+} from "../api/concessionLinks";
 
 export function ResourceFormPage() {
   const { moduleKey = "", id } = useParams();
@@ -102,6 +110,40 @@ export function ResourceFormPage() {
           onAdd={(personId) => addRelationship("WITNESS_IN", "Person", personId, "Hearing", id)}
         />
       )}
+      {!isNew && id && module.key === "concessions" && (
+        <>
+          <RelatedListPanel
+            title="Quarters affected"
+            emptyMessage="No quarters linked yet."
+            pickerLabel="Add a quarter…"
+            labelField="name"
+            listCurrent={() => listConcessionQuarters(id)}
+            listCandidates={listQuartersForPicker}
+            onAdd={(quarterId) => addRelationship("AFFECTS", "Concession", id, "Quarter", quarterId)}
+          />
+          <RelatedListPanel
+            title="Commitments"
+            emptyMessage="No commitments linked yet."
+            pickerLabel="Add a commitment…"
+            labelField="title"
+            listCurrent={() => listConcessionCommitments(id)}
+            listCandidates={listCommitmentsForPicker}
+            onAdd={(commitmentId) => addRelationship("COMMITTED", "Concession", id, "Commitment", commitmentId)}
+          />
+        </>
+      )}
+      {!isNew && id && module.key === "commitments" && (
+        <RelatedListPanel
+          title="Quarters benefiting"
+          emptyMessage="No quarters linked yet."
+          pickerLabel="Add a quarter…"
+          labelField="name"
+          listCurrent={() => listCommitmentQuarters(id)}
+          listCandidates={listQuartersForPicker}
+          onAdd={(quarterId) => addRelationship("BENEFITS", "Commitment", id, "Quarter", quarterId)}
+        />
+      )}
+      {!isNew && id && module.key === "communications" && <CommunicationAboutPanel recordId={id} />}
     </div>
   );
 }

@@ -318,6 +318,26 @@ export const RESOURCES: Record<string, ResourceDef> = {
     { key: "notes", type: "string" },
   ]),
 
+  // --- Concessions and commitments (Phase 4, schema-patch spec, 2026-09-26) ---
+  // A concession often spans districts; each office records its own node,
+  // and agreement_reference lets them be matched at county level later —
+  // same MVP tradeoff as Contractor.registration_number.
+  Concession: resource("Concession", true, [
+    { key: "name", type: "string", required: true },
+    { key: "holder_company", type: "string" },
+    { key: "type", type: "string" }, // agriculture | mining | forestry | other
+    { key: "agreement_reference", type: "string" }, // social agreement or MOU reference
+    { key: "agreement_date", type: "date" },
+  ]),
+  Commitment: resource("Commitment", true, [
+    { key: "title", type: "string", required: true }, // e.g. "School for Bondi Village"
+    { key: "description", type: "string" },
+    { key: "due_date", type: "date" },
+    { key: "status", type: "string", required: true }, // pending | in_progress | partial | delivered | not_delivered
+    { key: "source_document", type: "string" }, // clause or page reference
+    { key: "last_verified_date", type: "date" }, // when someone last checked on the ground
+  ]),
+
   // --- Offline sync bookkeeping ---
   SyncConflict: resource("SyncConflict", false, [
     { key: "entity_label", type: "string", required: true },
@@ -420,6 +440,15 @@ export const RELATIONSHIPS: RelationshipDef[] = [
   { type: "BUILT_BY", from: "PublicWorksItem", to: "Contractor" },
   { type: "PAID_TO", from: "Expenditure", to: "Contractor" },
   { type: "FOR", from: "Expenditure", to: "PublicWorksItem" },
+
+  // Phase 4 (schema-patch spec, 2026-09-26): concessions and commitments.
+  // The two ABOUT edges let a citizen complaint (CommunicationLog, from
+  // WhatsApp/SMS) attach to the specific promise or project it concerns.
+  { type: "AFFECTS", from: "Concession", to: "Quarter" },
+  { type: "COMMITTED", from: "Concession", to: "Commitment" },
+  { type: "BENEFITS", from: "Commitment", to: "Quarter" },
+  { type: "ABOUT", from: "CommunicationLog", to: "Commitment" },
+  { type: "ABOUT", from: "CommunicationLog", to: "PublicWorksItem" },
 ];
 
 export function isRelationshipAllowed(

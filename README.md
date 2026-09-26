@@ -148,6 +148,25 @@ new resources/relationships with no legacy data to reconcile:
   those cases and any witness who's testified across more than one of
   them.
 
+**Phase 4** — the last phase in the schema-patch spec — added concessions
+and commitments, again with no migration:
+
+- **Concessions** (`/concessions`) and **Commitments** (`/commitments`):
+  new modules. A concession affects one or more Quarters (`AFFECTS`) and
+  commits to one or more Commitments (`COMMITTED`); a commitment benefits
+  one or more Quarters (`BENEFITS`). Pickers for both live on the
+  respective edit pages.
+- **"What is this about?"** on a Communications entry: links a citizen
+  complaint to the specific Commitment and/or PublicWorksItem it concerns
+  (`ABOUT`, single-target on each side — picking a different one replaces
+  the previous link).
+- **`unmet-commitments`** (Analysis): a concession's commitments that
+  aren't delivered and are overdue (or have no due date), with the
+  quarters benefiting and how many complaints have piled up against each.
+- **`quarters-left-out`** (Analysis) now also shows any concession
+  affecting a left-out quarter and that concession's undelivered
+  commitments benefiting it.
+
 See [`docs/graph-schema.md`](docs/graph-schema.md) for the full generated
 schema reference (regenerated at the end of every phase).
 

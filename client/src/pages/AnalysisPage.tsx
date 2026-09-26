@@ -8,6 +8,7 @@ import {
   runRepeatLandCases,
   runStalledContractors,
   runUnapprovedDisbursements,
+  runUnmetCommitments,
   type CheckResult,
 } from "../api/analysis";
 
@@ -35,6 +36,8 @@ const CHECKS: CheckDef[] = [
           <tr>
             <th>Quarter</th>
             <th>Population</th>
+            <th>Concession(s)</th>
+            <th>Unmet commitments</th>
           </tr>
         </thead>
         <tbody>
@@ -42,6 +45,8 @@ const CHECKS: CheckDef[] = [
             <tr key={f.quarter_id as string}>
               <td>{f.quarter as string}</td>
               <td>{money(f.population)}</td>
+              <td>{(f.concessions as string[]).join(", ") || "—"}</td>
+              <td>{(f.unmet_commitments as string[]).join(", ") || "—"}</td>
             </tr>
           ))}
         </tbody>
@@ -228,6 +233,42 @@ const CHECKS: CheckDef[] = [
         </table>
       );
     },
+  },
+  {
+    key: "unmet-commitments",
+    title: "Unmet commitments",
+    description: "A concession's commitments that are overdue (or have no due date) and not yet delivered, with complaints logged against each.",
+    run: runUnmetCommitments,
+    render: (findings) => (
+      <table className="record-table">
+        <thead>
+          <tr>
+            <th>Concession</th>
+            <th>Commitment</th>
+            <th>Status</th>
+            <th>Due date</th>
+            <th>Quarters</th>
+            <th>Complaints</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {findings.map((f) => (
+            <tr key={f.commitment_id as string}>
+              <td>{f.concession as string}</td>
+              <td>{f.title as string}</td>
+              <td>{(f.status as string).split("_").join(" ")}</td>
+              <td>{(f.due_date as string) || "—"}</td>
+              <td>{(f.quarters as string[]).join(", ") || "—"}</td>
+              <td>{money(f.complaints)}</td>
+              <td>
+                <Link to={`/commitments/${f.commitment_id}`}>View</Link>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    ),
   },
 ];
 
